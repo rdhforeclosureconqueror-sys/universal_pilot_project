@@ -1,0 +1,338 @@
+{
+  "training_config": {
+    "sandbox_required": true,
+    "tracks": [
+      {
+        "track_key": "sys_operator_v1",
+        "display_name": "System Operator (Level 1)",
+        "description": "Operate programs, intake, documents, referrals, consent, audit, outcomes.",
+        "requires": {
+          "lessons": [
+            "universal_flow_foundation",
+            "case_states_and_stage_integrity",
+            "policy_versions_mastery",
+            "document_enum_safety_and_meta",
+            "referrals_outbox_and_idempotency",
+            "consent_gate_invariants",
+            "audit_log_completeness",
+            "sandbox_isolation_rules"
+          ],
+          "quizzes": [
+            "quiz_universal_flow",
+            "quiz_policy_versions",
+            "quiz_consent_and_audit",
+            "quiz_referral_outbox_and_idempotency"
+          ],
+          "taskchecks": [
+            "create_case_endpoint",
+            "document_upload_verified",
+            "policy_driven_flow_verified",
+            "consent_gate_verified",
+            "outbox_idempotency_verified"
+          ]
+        }
+      },
+      {
+        "track_key": "sys_implementer_v1",
+        "display_name": "System Implementer",
+        "description": "Deploy and integrate modules (policy_versions-driven), environment setup.",
+        "requires": {
+          "lessons": [
+            "universal_flow_foundation",
+            "policy_versions_mastery",
+            "referrals_outbox_and_idempotency",
+            "consent_gate_invariants",
+            "audit_log_completeness",
+            "sandbox_isolation_rules"
+          ],
+          "quizzes": [
+            "quiz_universal_flow",
+            "quiz_policy_versions",
+            "quiz_consent_and_audit"
+          ],
+          "taskchecks": [
+            "create_case_endpoint",
+            "policy_driven_flow_verified",
+            "outbox_idempotency_verified"
+          ]
+        }
+      },
+      {
+        "track_key": "audit_consent_steward_v1",
+        "display_name": "Audit & Consent Steward",
+        "description": "Consent scopes, audit completeness, safe data boundaries.",
+        "requires": {
+          "lessons": [
+            "case_states_and_stage_integrity",
+            "consent_gate_invariants",
+            "audit_log_completeness",
+            "sandbox_isolation_rules"
+          ],
+          "quizzes": [
+            "quiz_consent_and_audit"
+          ],
+          "taskchecks": [
+            "consent_gate_verified"
+          ]
+        }
+      },
+      {
+        "track_key": "diamond_ai_steward_v1",
+        "display_name": "Diamond AI Steward (Optional)",
+        "description": "AI roles, kill switches, logging, dry-run, incident flags.",
+        "optional": true,
+        "requires": {
+          "lessons": [
+            "ai_roles_and_boundaries",
+            "ai_kill_switches_and_dry_run"
+          ],
+          "quizzes": [],
+          "taskchecks": [
+            "ai_logging_verified",
+            "ai_kill_switch_verified"
+          ]
+        }
+      }
+    ],
+    "required_lessons": [
+      {
+        "lesson_key": "universal_flow_foundation",
+        "title": "Universal Flow Foundation",
+        "objectives": [
+          "Explain and diagram the locked Universal Flow."
+        ]
+      },
+      {
+        "lesson_key": "case_states_and_stage_integrity",
+        "title": "Case States & Stage Integrity",
+        "objectives": [
+          "Explain allowed states and prohibited transitions; demonstrate enforcement."
+        ]
+      },
+      {
+        "lesson_key": "policy_versions_mastery",
+        "title": "Policy Versions Mastery",
+        "objectives": [
+          "Configure policy_versions.config_json and demonstrate behavior change without code edits."
+        ]
+      },
+      {
+        "lesson_key": "document_enum_safety_and_meta",
+        "title": "Document Enum Safety & Metadata",
+        "objectives": [
+          "Store documents correctly using doc_type='other' with canonical evidence metadata."
+        ]
+      },
+      {
+        "lesson_key": "referrals_outbox_and_idempotency",
+        "title": "Referrals: Outbox & Idempotency",
+        "objectives": [
+          "Explain outbox + dedupe + retry; demonstrate non-duplication under retries."
+        ]
+      },
+      {
+        "lesson_key": "consent_gate_invariants",
+        "title": "Consent Gate Invariants",
+        "objectives": [
+          "Prove referrals cannot proceed without valid consent; demonstrate block-and-log."
+        ]
+      },
+      {
+        "lesson_key": "audit_log_completeness",
+        "title": "Audit Log Completeness",
+        "objectives": [
+          "Prove every critical action creates an audit log entry with reason and context."
+        ]
+      },
+      {
+        "lesson_key": "sandbox_isolation_rules",
+        "title": "Sandbox Isolation Rules",
+        "objectives": [
+          "Demonstrate sandbox-only training and deny production exposure."
+        ]
+      },
+      {
+        "lesson_key": "foreclosure_module_integration_basics",
+        "title": "Foreclosure Module Integration Basics",
+        "optional": true,
+        "objectives": [
+          "Deploy foreclosure policy module without changing architecture."
+        ]
+      },
+      {
+        "lesson_key": "real_estate_module_10_bulk_upload_drafts",
+        "title": "Module 10: Bulk Upload Draft-Only",
+        "optional": true,
+        "objectives": [
+          "Demonstrate bulk upload creates draft-only cases with idempotent dedupe and manual promotion."
+        ]
+      },
+      {
+        "lesson_key": "ai_roles_and_boundaries",
+        "title": "AI Roles & Boundaries",
+        "optional": true,
+        "objectives": [
+          "Explain assistive/advisory/automated roles and confirm AI cannot decide outcomes."
+        ]
+      },
+      {
+        "lesson_key": "ai_kill_switches_and_dry_run",
+        "title": "AI Kill Switches & Dry Run",
+        "optional": true,
+        "objectives": [
+          "Demonstrate kill switches and optional dry-run; ensure full logging."
+        ]
+      }
+    ],
+    "required_quizzes": [
+      {
+        "quiz_key": "quiz_universal_flow",
+        "title": "Universal Flow Quiz",
+        "min_pass_score": 0.8
+      },
+      {
+        "quiz_key": "quiz_policy_versions",
+        "title": "Policy Versions Quiz",
+        "min_pass_score": 0.8
+      },
+      {
+        "quiz_key": "quiz_consent_and_audit",
+        "title": "Consent & Audit Quiz",
+        "min_pass_score": 0.8
+      },
+      {
+        "quiz_key": "quiz_referral_outbox_and_idempotency",
+        "title": "Referral Outbox & Idempotency Quiz",
+        "min_pass_score": 0.8
+      }
+    ],
+    "canonical_task_checks": [
+      {
+        "skill_key": "create_case_endpoint",
+        "track_key": "sys_operator_v1",
+        "required_action": "POST /cases returns 201 and creates audit log entry",
+        "evidence_required": [
+          "api_response",
+          "verifier_report"
+        ],
+        "human_signoff_required": true,
+        "failure_condition": "missing audit log or bypasses policy binding"
+      },
+      {
+        "skill_key": "document_upload_verified",
+        "track_key": "sys_operator_v1",
+        "required_action": "Upload a document stored as doc_type='other' with meta.evidence_type",
+        "evidence_required": [
+          "api_response",
+          "verifier_report"
+        ],
+        "human_signoff_required": true,
+        "failure_condition": "new enum introduced or missing meta"
+      },
+      {
+        "skill_key": "policy_driven_flow_verified",
+        "track_key": "sys_operator_v1",
+        "required_action": "Changing policy_versions.config_json changes required docs/tasks without code edits",
+        "evidence_required": [
+          "policy_diff",
+          "behavior_diff",
+          "verifier_report"
+        ],
+        "human_signoff_required": true,
+        "failure_condition": "hardcoded rules or policy not referenced"
+      },
+      {
+        "skill_key": "consent_gate_verified",
+        "track_key": "audit_consent_steward_v1",
+        "required_action": "Attempt referral without consent is blocked and logged",
+        "evidence_required": [
+          "api_response",
+          "verifier_report"
+        ],
+        "human_signoff_required": true,
+        "failure_condition": "referral queues without consent"
+      },
+      {
+        "skill_key": "outbox_idempotency_verified",
+        "track_key": "sys_operator_v1",
+        "required_action": "Referral delivery is queued to outbox with dedupe protection; retries do not duplicate",
+        "evidence_required": [
+          "api_response",
+          "verifier_report"
+        ],
+        "human_signoff_required": true,
+        "failure_condition": "duplicate deliveries created"
+      },
+      {
+        "skill_key": "bulk_upload_draft_only_verified",
+        "track_key": "sys_implementer_v1",
+        "optional": true,
+        "required_action": "PDF/CSV bulk upload produces draft cases only (intake_incomplete) with idempotent dedupe",
+        "evidence_required": [
+          "verifier_report",
+          "api_response"
+        ],
+        "human_signoff_required": true,
+        "failure_condition": "cases auto-advance without human review or duplicates created"
+      },
+      {
+        "skill_key": "ai_logging_verified",
+        "track_key": "diamond_ai_steward_v1",
+        "optional": true,
+        "required_action": "AI suggestion creates ai_activity_logs entry linked to audit_logs with prompt_hash and decision_type",
+        "evidence_required": [
+          "verifier_report"
+        ],
+        "human_signoff_required": true,
+        "failure_condition": "ai output not logged or not linked"
+      },
+      {
+        "skill_key": "ai_kill_switch_verified",
+        "track_key": "diamond_ai_steward_v1",
+        "optional": true,
+        "required_action": "Global AI disable is immediate, reversible, audited, and stops automated AI",
+        "evidence_required": [
+          "verifier_report"
+        ],
+        "human_signoff_required": true,
+        "failure_condition": "AI continues after kill switch"
+      }
+    ],
+    "milestones": [
+      {
+        "milestone_key": "core_training_complete",
+        "title": "Core Training Complete",
+        "required_skills": [
+          "create_case_endpoint",
+          "document_upload_verified",
+          "policy_driven_flow_verified",
+          "consent_gate_verified",
+          "outbox_idempotency_verified"
+        ]
+      }
+    ],
+    "cert_rules": [
+      {
+        "cert_key": "sys_operator_cert_v1",
+        "milestone_key": "core_training_complete",
+        "expires_after_days": 730
+      },
+      {
+        "cert_key": "sys_implementer_cert_v1",
+        "milestone_key": "core_training_complete",
+        "expires_after_days": 730
+      }
+    ],
+    "cert_revocation_triggers": [
+      "bypassed_consent_gate",
+      "missing_audit_log",
+      "hardcoded_policy_logic",
+      "unauthorized_data_access",
+      "training_used_production_data",
+      "ai_made_decision_without_human_confirmation"
+    ],
+    "optional_job_matching": {
+      "enabled": false
+    }
+  }
+}
