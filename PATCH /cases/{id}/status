@@ -1,0 +1,43 @@
+class StatusUpdate(BaseModel):
+    new_status: CaseStatus
+    reason_code: str
+
+@router.patch("/{case_id}/status")
+def update_status(case_id: str, payload: StatusUpdate, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    case = db.query(Case).filter(Case.id == case_id).first()
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    if not is_valid_transition(case.status, payload.new_status):
+        # Blocked transition — log it
+        audit = AuditLog(
+            id=uuid.uuid4(),
+            case_id=case.id,
+            actor_id=user.id,
+            action_type="case_state_change_blocked",
+            reason_code="transition_forbidden",
+            before_state={"status": case.status},
+            after_state={"attempted": payload.new_status},
+            created_at=datetime.utcnow()
+        )
+        db.add(audit)
+        db.commit()
+        raise HTTPException(status_code=409, detail="Invalid status transition")
+
+    before = case.status
+    case.status = payload.new_status
+    db.add(case)
+
+    audit = AuditLog(
+        id=uuid.uuid4(),
+        case_id=case.id,
+        actor_id=user.id,
+        action_type="case_state_change",
+        reason_code=payload.reason_code,
+        before_state={"status": before},
+        after_state={"status": case.status},
+        created_at=datetime.utcnow()
+    )
+    db.add(audit)
+    db.commit()
+    return {"case_id": case.id, "status": case.status}
