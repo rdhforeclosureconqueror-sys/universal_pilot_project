@@ -1,62 +1,62 @@
 import os
 import sys
 from logging.config import fileConfig
+
 from sqlalchemy import engine_from_config, pool
 from alembic import context
 from dotenv import load_dotenv
 
-# Load environment variables from .env
+# ✅ Load environment variables from .env
 load_dotenv()
 
-# Add project root to Python path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+# ✅ Add project root to sys.path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-# Import your base and models
+# ✅ Import your base and models
 from models.base import Base
-import models  # registers all models
+import models  # this ensures all models are registered with Base.metadata
 
-# Alembic config object
+# Alembic Config object
 config = context.config
-fileConfig(config.config_file_name)
 
-# Metadata from SQLAlchemy models
+# Logging configuration
+if config.config_file_name is not None:
+    fileConfig(config.config_file_name)
+
+# ✅ Tell Alembic what metadata to look at for autogeneration
 target_metadata = Base.metadata
 
-def run_migrations_offline():
+
+def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode."""
     url = os.getenv("DATABASE_URL")
-    if not url:
-        raise RuntimeError("DATABASE_URL not found in environment.")
     context.configure(
         url=url,
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
     )
+
     with context.begin_transaction():
         context.run_migrations()
 
-def run_migrations_online():
+
+def run_migrations_online() -> None:
     """Run migrations in 'online' mode."""
     url = os.getenv("DATABASE_URL")
-    if not url:
-        raise RuntimeError("DATABASE_URL not found in environment.")
     connectable = engine_from_config(
-        {
-            "sqlalchemy.url": url
-        },
+        {"sqlalchemy.url": url},
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
+
     with connectable.connect() as connection:
-        context.configure(
-            connection=connection,
-            target_metadata=target_metadata
-        )
+        context.configure(connection=connection, target_metadata=target_metadata)
+
         with context.begin_transaction():
             context.run_migrations()
 
-# Run the correct mode
+
 if context.is_offline_mode():
     run_migrations_offline()
 else:
