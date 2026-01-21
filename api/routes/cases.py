@@ -5,6 +5,7 @@ from models.cases import Case, CaseStatus
 from models.audit_logs import AuditLog
 from auth.dependencies import get_current_user
 from db.session import get_db
+from policy.loader import PolicyEngine  # ✅ Added
 import uuid
 from datetime import datetime
 
@@ -36,10 +37,16 @@ class StatusUpdate(BaseModel):
 # 🚀 POST /cases
 @router.post("/", status_code=201)
 def create_case(payload: CaseCreate, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    # ✅ Load policy engine and get active policy
+    policy_engine = PolicyEngine(db)
+    policy = policy_engine.get_active_policy(program_key="training_sandbox")
+
+    # ✅ Create case with assigned policy_version_id
     case = Case(
         id=uuid.uuid4(),
         status=CaseStatus.intake_submitted,
         program_type=payload.program_type,
+        policy_version_id=policy.id,
         created_by=user.id
     )
     db.add(case)
