@@ -5,7 +5,7 @@ from models.cases import Case, CaseStatus
 from models.audit_logs import AuditLog
 from auth.dependencies import get_current_user
 from db.session import get_db
-from policy.loader import PolicyEngine  # ✅ Added
+from policy.loader import PolicyEngine
 import uuid
 from datetime import datetime
 
@@ -29,6 +29,7 @@ def is_valid_transition(current: str, new: str) -> bool:
 # 📦 Payload schemas
 class CaseCreate(BaseModel):
     program_type: str | None = None
+    meta: dict | None = None  # ✅ Add support for incoming meta
 
 class StatusUpdate(BaseModel):
     new_status: CaseStatus
@@ -37,17 +38,27 @@ class StatusUpdate(BaseModel):
 # 🚀 POST /cases
 @router.post("/", status_code=201)
 def create_case(payload: CaseCreate, db: Session = Depends(get_db), user=Depends(get_current_user)):
-    # ✅ Load policy engine and get active policy
     policy_engine = PolicyEngine(db)
-    policy = policy_engine.get_active_policy(program_key="training_sandbox")
+    
+    # 🔁 Use correct program_type for active policy
+    program_key = payload.program_type or "default_program"
+    policy = policy_engine.get_active_policy(program_key=program_key)
 
-    # ✅ Create case with assigned policy_version_id
+    # ✅ Validate meta fields using policy-defined custom_fields
+    incoming_meta = payload.meta or {}
+    custom_fields = policy.config_json.get("custom_fields", [])
+    for field in incoming_meta.keys():
+        if field not in custom_fields:
+            raise HTTPException(status_code=422, detail=f"Field '{field}' not allowed by policy")
+
+    # ✅ Create the case with meta
     case = Case(
         id=uuid.uuid4(),
         status=CaseStatus.intake_submitted,
         program_type=payload.program_type,
         policy_version_id=policy.id,
-        created_by=user.id
+        created_by=user.id,
+        meta=incoming_meta  # ✅ Save meta to DB
     )
     db.add(case)
 
@@ -62,8 +73,10 @@ def create_case(payload: CaseCreate, db: Session = Depends(get_db), user=Depends
         created_at=datetime.utcnow()
     )
     db.add(audit)
+
     db.commit()
     db.refresh(case)
+
     return {"case_id": case.id, "status": case.status}
 
 # 🔄 PATCH /cases/{id}/status
@@ -74,7 +87,6 @@ def update_status(case_id: str, payload: StatusUpdate, db: Session = Depends(get
         raise HTTPException(status_code=404, detail="Case not found")
 
     if not is_valid_transition(case.status, payload.new_status):
-        # Blocked transition — log it
         audit = AuditLog(
             id=uuid.uuid4(),
             case_id=case.id,
@@ -104,5 +116,6 @@ def update_status(case_id: str, payload: StatusUpdate, db: Session = Depends(get
         created_at=datetime.utcnow()
     )
     db.add(audit)
+
     db.commit()
     return {"case_id": case.id, "status": case.status}
