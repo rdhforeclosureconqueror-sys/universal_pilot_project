@@ -6,6 +6,7 @@ from db.session import get_db
 from models.training_quiz_attempts import TrainingQuizAttempt
 from models.certifications import Certification
 from models.policy_versions import PolicyVersion
+from models.cases import Case  # ✅ FIXED: missing import
 from audit.logger import log_audit
 from policy.loader import PolicyEngine
 from uuid import uuid4
@@ -21,7 +22,7 @@ class QuizSubmission(BaseModel):
 @router.post("/quiz_attempt", status_code=201)
 def submit_quiz_attempt(request: QuizSubmission, db: Session = Depends(get_db), user=Depends(get_current_user)):
     # Load policy and config
-    case = db.query(models.Case).filter_by(id=request.case_id).first()
+    case = db.query(Case).filter_by(id=request.case_id).first()  # ✅ FIXED: models.Case -> Case
     if not case or case.case_type != "training_enrollment":
         raise HTTPException(status_code=400, detail="Not a training case")
 
