@@ -1,4 +1,7 @@
 const ENUMS = {
+  caseStatus: [],
+  documentType: [],
+  referralStatus: [],
   caseStatus: [
     "intake_submitted",
     "intake_incomplete",

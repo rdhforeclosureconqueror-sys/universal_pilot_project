@@ -8,6 +8,8 @@ const state = {
   consentState: new Map(),
   propertyEndpointsAvailable: false,
   caseListAvailable: false,
+  mapInstance: null,
+  detailMapInstance: null,
 };
 
 const uuidPattern =
@@ -89,6 +91,14 @@ const detectEndpoint = (openApi, path, method = "get") => {
 const detectPropertyEndpoints = (openApi) => {
   const paths = Object.keys(openApi?.paths || {});
   return paths.some((path) => path.includes("property"));
+};
+
+const fetchJson = async (url) => {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Request failed: ${response.status}`);
+  }
+  return response.json();
 };
 
 const setPage = (pageId) => {
@@ -308,6 +318,77 @@ const initDetailMap = () => {
     attribution: "&copy; OpenStreetMap contributors",
   }).addTo(map);
   return map;
+};
+
+const renderPropertiesTable = (properties) => {
+  const tbody = document.querySelector("#property-list-table tbody");
+  tbody.innerHTML = "";
+  if (!properties.length) {
+    document.getElementById("property-list-state").textContent =
+      "No properties found yet. Import auction CSV data to get started.";
+    return;
+  }
+  document.getElementById("property-list-state").textContent = "";
+  properties.forEach((prop) => {
+    const row = document.createElement("tr");
+    row.innerHTML = `
+      <td>${prop.address || "—"}</td>
+      <td>${prop.city || "—"}</td>
+      <td>${prop.state || "—"}</td>
+      <td>${prop.zip || "—"}</td>
+      <td>${prop.case_status || "—"}</td>
+      <td>${prop.case_id || "—"}</td>
+    `;
+    tbody.appendChild(row);
+  });
+};
+
+const renderMapPins = (map, properties) => {
+  if (!map) {
+    return;
+  }
+  const hasCoordinates = properties.some(
+    (prop) => prop.latitude && prop.longitude
+  );
+  if (!hasCoordinates) {
+    document.getElementById("map-empty-state").textContent =
+      "Properties are missing coordinates. Ensure geocoding completes during import.";
+    return;
+  }
+  properties.forEach((prop) => {
+    if (prop.latitude && prop.longitude) {
+      L.marker([prop.latitude, prop.longitude])
+        .addTo(map)
+        .bindPopup(`${prop.address}<br />Status: ${prop.case_status || "—"}`);
+    }
+  });
+};
+
+const loadProperties = async (mapInstance) => {
+  if (!state.propertyEndpointsAvailable) {
+    return;
+  }
+  const properties = await fetchJson(`${getApiBase()}/properties/`);
+  renderPropertiesTable(properties);
+  renderMapPins(mapInstance, properties);
+};
+
+const loadPropertyDetail = async (propertyId, mapInstance) => {
+  if (!state.propertyEndpointsAvailable || !propertyId) {
+    return;
+  }
+  const detail = await fetchJson(`${getApiBase()}/properties/${propertyId}`);
+  const container = document.getElementById("property-detail");
+  container.innerHTML = `
+    <div class="panel"><strong>Address:</strong> ${detail.address || "—"}</div>
+    <div class="panel"><strong>Status:</strong> ${detail.case_status || "—"}</div>
+    <div class="panel"><strong>Case:</strong> ${detail.case_id || "—"}</div>
+    <div class="panel"><strong>Loan Type:</strong> ${detail.loan_type || "—"}</div>
+  `;
+  if (mapInstance && detail.latitude && detail.longitude) {
+    mapInstance.setView([detail.latitude, detail.longitude], 14);
+    L.marker([detail.latitude, detail.longitude]).addTo(mapInstance);
+  }
 };
 
 const handleDocumentUpload = async (event) => {
@@ -589,8 +670,27 @@ const wireEvents = () => {
 
   document.getElementById("property-import-form").addEventListener("submit", (event) => {
     event.preventDefault();
-    document.getElementById("property-import-hint").textContent =
-      "CSV import requires backend support and admin authorization.";
+    const fileInput = event.target.csv_file;
+    if (!fileInput.files.length) {
+      document.getElementById("property-import-hint").textContent =
+        "Select a CSV file to import.";
+      return;
+    }
+    const formData = new FormData();
+    formData.append("file", fileInput.files[0]);
+    fetch(`${getApiBase()}/imports/auction`, {
+      method: "POST",
+      body: formData,
+    })
+      .then((response) => response.json())
+      .then((result) => {
+        document.getElementById("property-import-hint").textContent =
+          `Imported ${result.records_created} properties.`;
+      })
+      .catch(() => {
+        document.getElementById("property-import-hint").textContent =
+          "Import failed. Ensure backend supports /imports/auction-csv.";
+      });
   });
 
   document
@@ -613,6 +713,14 @@ const wireEvents = () => {
   document.getElementById("map-refresh").addEventListener("click", () => {
     updateMapStatus();
   });
+
+  document
+    .getElementById("property-detail-form")
+    .addEventListener("submit", (event) => {
+      event.preventDefault();
+      const propertyId = event.target.property_id.value.trim();
+      loadPropertyDetail(propertyId, state.detailMapInstance);
+    });
 
   window.addEventListener("hashchange", () => {
     const page = window.location.hash.replace("#/", "");
@@ -661,11 +769,13 @@ const init = async () => {
   }
 
   const map = initMap();
+  state.mapInstance = map;
   if (!map) {
     document.getElementById("map-status").textContent =
       "Map library unavailable. Ensure Leaflet loads in production.";
   }
   const detailMap = initDetailMap();
+  state.detailMapInstance = detailMap;
   if (!detailMap) {
     document.getElementById("property-map-status").textContent =
       "Map library unavailable. Ensure Leaflet loads in production.";
@@ -674,6 +784,8 @@ const init = async () => {
   wireEvents();
   updateDocumentFields();
   updateValidation();
+
+  await loadProperties(map);
 
   const page = window.location.hash.replace("#/", "");
   setPage(page || "dashboard");
