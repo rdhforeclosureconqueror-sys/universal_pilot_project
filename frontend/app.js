@@ -571,7 +571,6 @@ const init = async () => {
     );
   }
 
-const init = () => {
   listCaseStatuses();
   listReferralStatuses();
   populateSelect("doc-type-select", ENUMS.documentType);

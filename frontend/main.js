@@ -214,10 +214,16 @@ const updateCaseListState = () => {
     stateEl.textContent =
       "No case listing endpoint found in OpenAPI. Case list is read-only until available.";
     hint.textContent = "Filtering requires a GET /cases endpoint.";
+    document.getElementById("case-list-table").classList.add("hidden");
   } else {
     stateEl.textContent = "";
     hint.textContent = "";
+    document.getElementById("case-list-table").classList.remove("hidden");
   }
+  const empty = document.getElementById("case-detail-empty");
+  empty.textContent = "Load a case to view lifecycle, documents, and consents.";
+  document.getElementById("case-timeline-empty").textContent =
+    "Timeline will appear after a case is loaded.";
 };
 
 const updatePropertyState = () => {
@@ -225,6 +231,8 @@ const updatePropertyState = () => {
   const exportButton = document.getElementById("property-export");
   const exportHint = document.getElementById("property-export-hint");
   const endpointPanel = document.getElementById("property-endpoint-status");
+  const importButton = document.getElementById("property-import-submit");
+  const importHint = document.getElementById("property-import-hint");
 
   if (!state.propertyEndpointsAvailable) {
     listState.textContent =
@@ -233,12 +241,19 @@ const updatePropertyState = () => {
     exportHint.textContent = "Export requires a backend property export endpoint.";
     endpointPanel.textContent =
       "Property endpoints not available. Map and detail views remain read-only.";
+    importButton.disabled = true;
+    importHint.textContent =
+      "CSV import requires admin permissions and backend support.";
   } else {
     listState.textContent = "";
     exportButton.disabled = false;
     exportHint.textContent = "";
     endpointPanel.textContent = "Property endpoints detected.";
+    importButton.disabled = false;
+    importHint.textContent = "Admin-only action.";
   }
+  document.getElementById("property-detail-empty").textContent =
+    "Select a property to view metadata and linked cases.";
 };
 
 const updateMapStatus = () => {
@@ -246,8 +261,12 @@ const updateMapStatus = () => {
   if (!state.propertyEndpointsAvailable) {
     status.textContent =
       "Map initialized. Awaiting property endpoints to plot pins.";
+    document.getElementById("map-empty-state").textContent =
+      "No property data available to render map pins.";
   } else {
     status.textContent = "Ready to plot property pins.";
+    document.getElementById("map-empty-state").textContent =
+      "Pins will appear once properties are loaded.";
   }
 };
 
@@ -258,9 +277,12 @@ const updatePropertyDetailState = () => {
     hint.textContent =
       "Property detail requires backend property endpoints. Disabled until available.";
     button.disabled = true;
+    document.getElementById("property-map-empty").textContent =
+      "Map will update once property data is available.";
   } else {
     hint.textContent = "";
     button.disabled = false;
+    document.getElementById("property-map-empty").textContent = "";
   }
 };
 
@@ -521,6 +543,22 @@ const updateValidation = () => {
   const consentRecord = state.consentState.get(caseDetailId);
   document.getElementById("case-consent-revoke-submit").disabled =
     !validateUuid(caseDetailId) || !consentRecord || consentRecord.revoked;
+  document.getElementById("document-upload-empty").textContent =
+    "Upload evidence to attach to a case.";
+  document.getElementById("document-view-empty").textContent =
+    "Search for documents by case or document ID.";
+  document.getElementById("referral-queue-empty").textContent =
+    "Queue referrals once consent is granted.";
+  document.getElementById("training-empty").textContent =
+    "Submit training quiz attempts to record outcomes.";
+  document.getElementById("certification-empty").textContent =
+    "Certification records will appear after training completion.";
+  document.getElementById("audit-empty").textContent =
+    "Audit logs are system-generated; use backend reports for exports.";
+  document.getElementById("ai-dryrun-empty").textContent =
+    "AI dry runs require consent and policy allowance.";
+  document.getElementById("ai-log-empty").textContent =
+    "AI activity logs populate after AI workflows execute.";
 };
 
 const wireEvents = () => {
@@ -548,6 +586,12 @@ const wireEvents = () => {
   document
     .getElementById("case-consent-revoke-form")
     .addEventListener("submit", handleCaseConsentRevoke);
+
+  document.getElementById("property-import-form").addEventListener("submit", (event) => {
+    event.preventDefault();
+    document.getElementById("property-import-hint").textContent =
+      "CSV import requires backend support and admin authorization.";
+  });
 
   document
     .getElementById("doc-type-select")
@@ -608,8 +652,12 @@ const init = async () => {
       li.textContent = status;
       referralList.appendChild(li);
     });
+    document.getElementById("referral-status-empty").textContent =
+      "Select a case to view referral history.";
   } else {
     referralList.textContent = "ReferralStatus enum not available.";
+    document.getElementById("referral-status-empty").textContent =
+      "Unable to render status list without backend enums.";
   }
 
   const map = initMap();
