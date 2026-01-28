@@ -1,7 +1,25 @@
 const ENUMS = {
-  caseStatus: [],
-  documentType: [],
-  referralStatus: [],
+  caseStatus: [
+    "intake_submitted",
+    "intake_incomplete",
+    "under_review",
+    "in_progress",
+    "program_completed_positive_outcome",
+    "case_closed_other_outcome",
+  ],
+  documentType: [
+    "id_verification",
+    "income_verification",
+    "lease_or_mortgage",
+    "foreclosure_notice",
+    "eviction_notice",
+    "signed_consent",
+    "taskcheck_evidence",
+    "training_proof",
+    "system_doc",
+    "other",
+  ],
+  referralStatus: ["draft", "queued", "sent", "failed", "cancelled"],
   aiRoles: ["assistive", "advisory", "automated"],
 };
 
