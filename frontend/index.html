@@ -3,394 +3,253 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Universal Pilot CRM</title>
-    <link rel="stylesheet" href="/static/crm.css" />
-    <link
-      rel="stylesheet"
-      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-      crossorigin=""
-    />
+    <title>Universal Pilot - Case Operations Console</title>
+    <link rel="stylesheet" href="styles.css" />
   </head>
-  <body class="theme-light">
-    <div class="app-shell">
-      <aside class="sidebar">
-        <div class="brand">
-          <span class="brand-mark">UP</span>
-          <div>
-            <h1>Universal Pilot CRM</h1>
-            <p>Enterprise Real Estate Operations</p>
+  <body>
+    <header>
+      <h1>Universal Pilot Case Operations Console</h1>
+      <p>
+        Frontend aligned to backend models, enums, and workflows. Actions call live
+        API endpoints; disabled states reflect backend gating rules.
+      </p>
+      <label class="field">
+        <span>API Base URL</span>
+        <input id="api-base" type="text" value="" placeholder="https://api.yourdomain.com" />
+        <small>Leave blank to use relative paths.</small>
+      </label>
+    </header>
+
+    <main>
+      <section>
+        <h2>Case Lifecycle</h2>
+        <div class="grid">
+          <div class="card">
+            <h3>Case Model Fields</h3>
+            <div class="schema-list" id="case-schema"></div>
+          </div>
+          <div class="card">
+            <h3>Current Statuses (CaseStatus enum)</h3>
+            <ul id="case-status-list"></ul>
+          </div>
+          <div class="card">
+            <h3>Create Case</h3>
+            <form id="case-create-form">
+              <label class="field">
+                <span>Program Key</span>
+                <input type="text" name="program_key" required />
+              </label>
+              <label class="field">
+                <span>Created By (UUID)</span>
+                <input type="text" name="created_by" placeholder="UUID" required />
+              </label>
+              <label class="field">
+                <span>Meta (JSON)</span>
+                <textarea name="meta" placeholder='{"custom_field": "value"}'></textarea>
+                <small>Custom fields must be allowed by the active policy.</small>
+              </label>
+              <button type="submit" id="case-create-submit" disabled>Create Case</button>
+              <p class="hint">Case status is derived from policy review requirements.</p>
+            </form>
+            <pre class="response" id="case-create-response"></pre>
           </div>
         </div>
-        <nav class="nav">
-          <a href="#/dashboard" data-page="dashboard" class="nav-link">Operator Dashboard</a>
-          <a href="#/cases" data-page="cases" class="nav-link">Case Management</a>
-          <a href="#/properties" data-page="properties" class="nav-link">Property Management</a>
-          <a href="#/map" data-page="map" class="nav-link">Property Map</a>
-          <a href="#/property-detail" data-page="property-detail" class="nav-link">Property Detail</a>
-          <a href="#/documents" data-page="documents" class="nav-link">Document Management</a>
-          <a href="#/referrals" data-page="referrals" class="nav-link">Referrals & Partners</a>
-          <a href="#/training" data-page="training" class="nav-link">Training & Certification</a>
-          <a href="#/audit" data-page="audit" class="nav-link">Audit & AI Logs</a>
-          <a href="/static/admin-dev.html" class="nav-link">Admin / Dev Console</a>
-        </nav>
-        <div class="sidebar-footer">
-          <label class="field">
-            <span>API Base URL</span>
-            <input id="api-base" type="text" placeholder="https://api.yourdomain.com" />
-            <small>Leave blank to use same origin.</small>
-          </label>
+      </section>
+
+      <section>
+        <h2>Document Upload & Viewing</h2>
+        <div class="grid">
+          <div class="card">
+            <h3>Upload Document</h3>
+            <form id="document-upload-form">
+              <label class="field">
+                <span>Case ID (UUID)</span>
+                <input type="text" name="case_id" required />
+              </label>
+              <label class="field">
+                <span>Document Type</span>
+                <select name="doc_type" id="doc-type-select" required></select>
+              </label>
+              <label class="field" id="evidence-type-field">
+                <span>Evidence Type (required for doc_type = other)</span>
+                <input type="text" name="evidence_type" />
+              </label>
+              <label class="field" id="document-meta-field">
+                <span>Meta (JSON)</span>
+                <textarea name="meta" placeholder='{"evidence_type": "custom"}'></textarea>
+                <small>Only used for doc_type = other.</small>
+              </label>
+              <label class="field">
+                <span>File</span>
+                <input type="file" name="file" required />
+              </label>
+              <button type="submit" id="document-upload-submit" disabled>Upload Document</button>
+            </form>
+            <pre class="response" id="document-upload-response"></pre>
+          </div>
+          <div class="card">
+            <h3>Get Document</h3>
+            <form id="document-get-form">
+              <label class="field">
+                <span>Document ID (UUID)</span>
+                <input type="text" name="doc_id" required />
+              </label>
+              <button type="submit" id="document-get-submit" disabled>Fetch Document</button>
+            </form>
+            <pre class="response" id="document-get-response"></pre>
+          </div>
+          <div class="card">
+            <h3>List Case Documents</h3>
+            <form id="document-list-form">
+              <label class="field">
+                <span>Case ID (UUID)</span>
+                <input type="text" name="case_id" required />
+              </label>
+              <button type="submit" id="document-list-submit" disabled>List Documents</button>
+            </form>
+            <pre class="response" id="document-list-response"></pre>
+          </div>
         </div>
-      </aside>
+      </section>
 
-      <main class="content">
-        <header class="topbar">
-          <div>
-            <h2 id="page-title">Operator Dashboard</h2>
-            <p id="page-subtitle">Status-aware overview of your operations.</p>
+      <section>
+        <h2>Consent Management</h2>
+        <div class="grid">
+          <div class="card">
+            <h3>Grant Consent</h3>
+            <form id="consent-grant-form">
+              <label class="field">
+                <span>Case ID (UUID)</span>
+                <input type="text" name="case_id" required />
+              </label>
+              <label class="field">
+                <span>Scope (comma-separated)</span>
+                <input type="text" name="scope" placeholder="referral, document_share" required />
+              </label>
+              <button type="submit" id="consent-grant-submit" disabled>Grant Consent</button>
+            </form>
+            <pre class="response" id="consent-grant-response"></pre>
           </div>
-          <div class="actions">
-            <button type="button" id="theme-toggle" class="ghost">Toggle Theme</button>
+          <div class="card">
+            <h3>Revoke Consent</h3>
+            <form id="consent-revoke-form">
+              <label class="field">
+                <span>Case ID (UUID)</span>
+                <input type="text" name="case_id" required />
+              </label>
+              <button type="submit" id="consent-revoke-submit" disabled>Revoke Consent</button>
+            </form>
+            <pre class="response" id="consent-revoke-response"></pre>
           </div>
-        </header>
+        </div>
+      </section>
 
-        <section class="page" data-page="dashboard">
-          <div class="grid two">
-            <div class="card">
-              <h3>Operational Metrics</h3>
-              <div class="metrics" id="metric-cards"></div>
-            </div>
-            <div class="card">
-              <h3>Case Status Summary</h3>
-              <ul id="case-status-summary" class="status-list"></ul>
-            </div>
-          </div>
-          <div class="grid two">
-            <div class="card">
-              <h3>Alerts & Blocks</h3>
-              <ul id="blocked-actions" class="status-list"></ul>
-            </div>
-            <div class="card">
-              <h3>Quick Links</h3>
-              <div class="quick-links" id="quick-links"></div>
-            </div>
-          </div>
-        </section>
+      <section>
+        <h2>Task Checks</h2>
+        <div class="card">
+          <p>Task checks are evaluated server-side. No direct UI actions are exposed.</p>
+          <div class="schema-list" id="taskcheck-schema"></div>
+        </div>
+      </section>
 
-        <section class="page" data-page="cases">
-          <div class="grid two">
-            <div class="card">
-              <h3>Case Filters</h3>
-              <form id="case-filter-form">
-                <label class="field">
-                  <span>Status</span>
-                  <select id="case-status-filter"></select>
-                </label>
-                <label class="field">
-                  <span>Program Key</span>
-                  <input type="text" name="program_key" />
-                </label>
-                <label class="field">
-                  <span>Date Range (YYYY-MM-DD)</span>
-                  <input type="text" name="date_from" placeholder="2025-01-01" />
-                  <input type="text" name="date_to" placeholder="2025-12-31" />
-                </label>
-                <button type="submit" class="primary" disabled>Filter Cases</button>
-                <p class="hint" id="case-filter-hint"></p>
-              </form>
-            </div>
-            <div class="card">
-              <h3>Case List</h3>
-              <div class="empty-state" id="case-list-state"></div>
-              <table class="data-table" id="case-list-table">
-                <thead>
-                  <tr>
-                    <th>Case ID</th>
-                    <th>Status</th>
-                    <th>Program Key</th>
-                    <th>Created At</th>
-                  </tr>
-                </thead>
-                <tbody></tbody>
-              </table>
-            </div>
+      <section>
+        <h2>Referrals</h2>
+        <div class="grid">
+          <div class="card">
+            <h3>Queue Referral</h3>
+            <form id="referral-queue-form">
+              <label class="field">
+                <span>Case ID (UUID)</span>
+                <input type="text" name="case_id" required />
+              </label>
+              <label class="field">
+                <span>Partner ID (UUID)</span>
+                <input type="text" name="partner_id" required />
+              </label>
+              <button type="submit" id="referral-queue-submit" disabled>Queue Referral</button>
+              <p class="hint">Requires active consent scope including <code>referral</code>.</p>
+            </form>
+            <pre class="response" id="referral-queue-response"></pre>
           </div>
-          <div class="grid two">
-            <div class="card">
-              <h3>Case Detail</h3>
-              <form id="case-detail-form">
-                <label class="field">
-                  <span>Case ID</span>
-                  <input type="text" name="case_id" required />
-                </label>
-                <button type="submit" class="primary">Load Case</button>
-              </form>
-              <div class="detail-stack" id="case-detail"></div>
-              <div class="detail-stack">
-                <div class="panel">
-                  <strong>Consents</strong>
-                  <form id="case-consent-grant-form">
-                    <label class="field">
-                      <span>Scope (comma-separated)</span>
-                      <input type="text" name="scope" placeholder="referral, document_share" />
-                    </label>
-                    <button type="submit" class="ghost" id="case-consent-grant-submit" disabled>
-                      Grant Consent
-                    </button>
-                  </form>
-                  <form id="case-consent-revoke-form">
-                    <button type="submit" class="ghost" id="case-consent-revoke-submit" disabled>
-                      Revoke Consent
-                    </button>
-                  </form>
-                  <pre class="response" id="case-consent-response"></pre>
-                </div>
-                <div class="panel">
-                  <strong>Documents</strong>
-                  <p class="hint">Use Document Management for uploads and retrieval.</p>
-                </div>
-                <div class="panel">
-                  <strong>Task Checks</strong>
-                  <p class="hint">Task checks are evaluated server-side; no direct UI actions.</p>
-                </div>
-                <div class="panel">
-                  <strong>Referrals</strong>
-                  <p class="hint">Use Referrals & Partners to queue referral actions.</p>
-                </div>
-              </div>
-            </div>
-            <div class="card">
-              <h3>Lifecycle Timeline</h3>
-              <div class="timeline" id="case-timeline"></div>
-            </div>
+          <div class="card">
+            <h3>Referral Statuses (ReferralStatus enum)</h3>
+            <ul id="referral-status-list"></ul>
           </div>
-        </section>
+        </div>
+      </section>
 
-        <section class="page" data-page="properties">
-          <div class="grid two">
-            <div class="card">
-              <h3>Property Portfolio</h3>
-              <div class="empty-state" id="property-list-state"></div>
-              <table class="data-table" id="property-list-table">
-                <thead>
-                  <tr>
-                    <th>Address</th>
-                    <th>City</th>
-                    <th>State</th>
-                    <th>ZIP</th>
-                    <th>Status</th>
-                    <th>Case</th>
-                  </tr>
-                </thead>
-                <tbody></tbody>
-              </table>
-            </div>
-            <div class="card">
-              <h3>Exports</h3>
-              <button type="button" class="primary" id="property-export" disabled>Export Properties</button>
-              <p class="hint" id="property-export-hint"></p>
-              <div class="panel" id="property-endpoint-status"></div>
-            </div>
-          </div>
-        </section>
+      <section>
+        <h2>Certifications</h2>
+        <div class="card">
+          <p>Certifications are issued through training workflows.</p>
+          <div class="schema-list" id="certification-schema"></div>
+        </div>
+      </section>
 
-        <section class="page" data-page="map">
-          <div class="card full">
-            <div class="map-header">
-              <div>
-                <h3>Property Map View</h3>
-                <p class="hint">Pins are rendered from backend property data only.</p>
-              </div>
-              <div class="map-actions">
-                <button type="button" class="ghost" id="map-refresh">Refresh</button>
-              </div>
-            </div>
-            <div id="property-map"></div>
-            <div class="panel" id="map-status"></div>
-          </div>
-        </section>
+      <section>
+        <h2>Training Quiz Attempts</h2>
+        <div class="card">
+          <form id="training-quiz-form">
+            <label class="field">
+              <span>Case ID (UUID)</span>
+              <input type="text" name="case_id" required />
+            </label>
+            <label class="field">
+              <span>Quiz Key</span>
+              <input type="text" name="quiz_key" required />
+            </label>
+            <label class="field">
+              <span>Answers (JSON)</span>
+              <textarea name="answers" placeholder='{"Question?": "Answer"}' required></textarea>
+            </label>
+            <button type="submit" id="training-quiz-submit" disabled>Submit Quiz Attempt</button>
+          </form>
+          <pre class="response" id="training-quiz-response"></pre>
+        </div>
+      </section>
 
-        <section class="page" data-page="property-detail">
-          <div class="grid two">
-            <div class="card">
-              <h3>Property Detail</h3>
-              <form id="property-detail-form">
-                <label class="field">
-                  <span>Property ID</span>
-                  <input type="text" name="property_id" />
-                </label>
-                <button type="submit" class="primary" disabled>Load Property</button>
-                <p class="hint" id="property-detail-hint"></p>
-              </form>
-              <div class="detail-stack" id="property-detail"></div>
-            </div>
-            <div class="card">
-              <h3>Location</h3>
-              <div id="property-detail-map"></div>
-              <div class="panel" id="property-map-status"></div>
-            </div>
-          </div>
-        </section>
+      <section>
+        <h2>Audit Logs</h2>
+        <div class="card">
+          <p>Audit logs are append-only and generated by backend actions.</p>
+          <div class="schema-list" id="audit-log-schema"></div>
+        </div>
+      </section>
 
-        <section class="page" data-page="documents">
-          <div class="grid two">
-            <div class="card">
-              <h3>Upload Document</h3>
-              <form id="document-upload-form">
-                <label class="field">
-                  <span>Case ID (UUID)</span>
-                  <input type="text" name="case_id" required />
-                </label>
-                <label class="field">
-                  <span>Document Type</span>
-                  <select name="doc_type" id="doc-type-select" required></select>
-                </label>
-                <label class="field" id="evidence-type-field">
-                  <span>Evidence Type (required for doc_type = other)</span>
-                  <input type="text" name="evidence_type" />
-                </label>
-                <label class="field" id="document-meta-field">
-                  <span>Meta (JSON)</span>
-                  <textarea name="meta" placeholder='{"evidence_type": "custom"}'></textarea>
-                </label>
-                <label class="field">
-                  <span>File</span>
-                  <input type="file" name="file" required />
-                </label>
-                <button type="submit" class="primary" id="document-upload-submit" disabled>
-                  Upload Document
-                </button>
-              </form>
-              <pre class="response" id="document-upload-response"></pre>
-            </div>
-            <div class="card">
-              <h3>View Documents</h3>
-              <form id="document-get-form">
-                <label class="field">
-                  <span>Document ID (UUID)</span>
-                  <input type="text" name="doc_id" required />
-                </label>
-                <button type="submit" class="primary" id="document-get-submit" disabled>
-                  Fetch Document
-                </button>
-              </form>
-              <form id="document-list-form">
-                <label class="field">
-                  <span>Case ID (UUID)</span>
-                  <input type="text" name="case_id" required />
-                </label>
-                <button type="submit" class="ghost" id="document-list-submit" disabled>
-                  List Case Documents
-                </button>
-              </form>
-              <pre class="response" id="document-get-response"></pre>
-              <pre class="response" id="document-list-response"></pre>
-            </div>
+      <section>
+        <h2>AI Activity Logs</h2>
+        <div class="grid">
+          <div class="card">
+            <h3>AI Dry Run</h3>
+            <form id="ai-dryrun-form">
+              <label class="field">
+                <span>Case ID (UUID)</span>
+                <input type="text" name="case_id" required />
+              </label>
+              <label class="field">
+                <span>Prompt</span>
+                <textarea name="prompt" required></textarea>
+              </label>
+              <label class="field">
+                <span>Role</span>
+                <select name="role" id="ai-role-select" required></select>
+              </label>
+              <label class="field">
+                <span>Policy Rule ID</span>
+                <input type="text" name="policy_rule_id" required />
+              </label>
+              <button type="submit" id="ai-dryrun-submit" disabled>Run AI Dry Run</button>
+            </form>
+            <pre class="response" id="ai-dryrun-response"></pre>
           </div>
-        </section>
-
-        <section class="page" data-page="referrals">
-          <div class="grid two">
-            <div class="card">
-              <h3>Referral Queue</h3>
-              <form id="referral-queue-form">
-                <label class="field">
-                  <span>Case ID (UUID)</span>
-                  <input type="text" name="case_id" required />
-                </label>
-                <label class="field">
-                  <span>Partner ID (UUID)</span>
-                  <input type="text" name="partner_id" required />
-                </label>
-                <button type="submit" class="primary" id="referral-queue-submit" disabled>
-                  Queue Referral
-                </button>
-                <p class="hint">Requires active consent scope including <code>referral</code>.</p>
-              </form>
-              <pre class="response" id="referral-queue-response"></pre>
-            </div>
-            <div class="card">
-              <h3>Referral Statuses</h3>
-              <ul id="referral-status-list" class="status-list"></ul>
-              <div class="panel" id="referral-endpoint-status"></div>
-            </div>
-          </div>
-        </section>
-
-        <section class="page" data-page="training">
-          <div class="grid two">
-            <div class="card">
-              <h3>Training Quiz Attempts</h3>
-              <form id="training-quiz-form">
-                <label class="field">
-                  <span>Case ID (UUID)</span>
-                  <input type="text" name="case_id" required />
-                </label>
-                <label class="field">
-                  <span>Quiz Key</span>
-                  <input type="text" name="quiz_key" required />
-                </label>
-                <label class="field">
-                  <span>Answers (JSON)</span>
-                  <textarea name="answers" placeholder='{"Question?": "Answer"}' required></textarea>
-                </label>
-                <button type="submit" class="primary" id="training-quiz-submit" disabled>
-                  Submit Quiz Attempt
-                </button>
-              </form>
-              <pre class="response" id="training-quiz-response"></pre>
-            </div>
-            <div class="card">
-              <h3>Certifications</h3>
-              <div class="detail-stack" id="certification-schema"></div>
-            </div>
-          </div>
-        </section>
-
-        <section class="page" data-page="audit">
-          <div class="grid two">
-            <div class="card">
-              <h3>Audit Log Fields</h3>
-              <div class="detail-stack" id="audit-log-schema"></div>
-              <p class="hint">Audit logs are append-only and generated by backend actions.</p>
-            </div>
-            <div class="card">
-              <h3>AI Dry Run</h3>
-              <form id="ai-dryrun-form">
-                <label class="field">
-                  <span>Case ID (UUID)</span>
-                  <input type="text" name="case_id" required />
-                </label>
-                <label class="field">
-                  <span>Prompt</span>
-                  <textarea name="prompt" required></textarea>
-                </label>
-                <label class="field">
-                  <span>Role</span>
-                  <select name="role" id="ai-role-select" required></select>
-                </label>
-                <label class="field">
-                  <span>Policy Rule ID</span>
-                  <input type="text" name="policy_rule_id" required />
-                </label>
-                <button type="submit" class="primary" id="ai-dryrun-submit" disabled>
-                  Run AI Dry Run
-                </button>
-              </form>
-              <pre class="response" id="ai-dryrun-response"></pre>
-            </div>
-          </div>
-          <div class="card full">
+          <div class="card">
             <h3>AI Activity Log Fields</h3>
-            <div class="detail-stack" id="ai-log-schema"></div>
+            <div class="schema-list" id="ai-log-schema"></div>
           </div>
-        </section>
-      </main>
-    </div>
+        </div>
+      </section>
+    </main>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-      crossorigin=""></script>
-    <script type="module" src="/static/main.js"></script>
+    <script type="module" src="app.js"></script>
   </body>
 </html>
