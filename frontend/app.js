@@ -113,6 +113,12 @@ const apiBaseInput = document.getElementById("api-base");
 const listCaseStatuses = () => {
   const list = document.getElementById("case-status-list");
   list.innerHTML = "";
+  if (!ENUMS.caseStatus.length) {
+    const li = document.createElement("li");
+    li.textContent = "No CaseStatus enum found in OpenAPI.";
+    list.appendChild(li);
+    return;
+  }
   ENUMS.caseStatus.forEach((status) => {
     const li = document.createElement("li");
     li.textContent = status;
@@ -123,6 +129,12 @@ const listCaseStatuses = () => {
 const listReferralStatuses = () => {
   const list = document.getElementById("referral-status-list");
   list.innerHTML = "";
+  if (!ENUMS.referralStatus.length) {
+    const li = document.createElement("li");
+    li.textContent = "No ReferralStatus enum found in OpenAPI.";
+    list.appendChild(li);
+    return;
+  }
   ENUMS.referralStatus.forEach((status) => {
     const li = document.createElement("li");
     li.textContent = status;
@@ -133,6 +145,15 @@ const listReferralStatuses = () => {
 const populateSelect = (selectId, values) => {
   const select = document.getElementById(selectId);
   select.innerHTML = "";
+  if (!values.length) {
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = "Unavailable";
+    select.appendChild(option);
+    select.disabled = true;
+    return;
+  }
+  select.disabled = false;
   values.forEach((value) => {
     const option = document.createElement("option");
     option.value = value;
@@ -164,6 +185,25 @@ const getApiBase = () => {
 const updateResponse = (targetId, payload) => {
   const el = document.getElementById(targetId);
   el.textContent = payload;
+};
+
+const fetchOpenApi = async () => {
+  const response = await fetch(`${getApiBase()}/openapi.json`);
+  if (!response.ok) {
+    throw new Error("Unable to load OpenAPI schema.");
+  }
+  return response.json();
+};
+
+const extractEnum = (schemas, enumName) => {
+  if (schemas?.[enumName]?.enum) {
+    return schemas[enumName].enum;
+  }
+  const match = Object.entries(schemas || {}).find(
+    ([key, schema]) =>
+      schema?.enum && key.toLowerCase().includes(enumName.toLowerCase())
+  );
+  return match ? match[1].enum : [];
 };
 
 const parseJsonField = (value) => {
@@ -516,6 +556,20 @@ const wireEvents = () => {
     el.addEventListener("input", updateFormValidation);
   });
 };
+
+const init = async () => {
+  try {
+    const openApi = await fetchOpenApi();
+    const schemas = openApi.components?.schemas;
+    ENUMS.caseStatus = extractEnum(schemas, "CaseStatus");
+    ENUMS.documentType = extractEnum(schemas, "DocumentType");
+    ENUMS.referralStatus = extractEnum(schemas, "ReferralStatus");
+  } catch (error) {
+    updateResponse(
+      "case-create-response",
+      "Unable to load OpenAPI schema; enums unavailable."
+    );
+  }
 
 const init = () => {
   listCaseStatuses();
