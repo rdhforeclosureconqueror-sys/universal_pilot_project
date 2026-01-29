@@ -1,10 +1,13 @@
 import csv
+import logging
 from datetime import datetime
 from uuid import uuid4
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 import json
 
+from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
+import pdfplumber
 from fastapi import APIRouter, UploadFile, File, Depends
 from sqlalchemy.orm import Session
 
@@ -17,6 +20,7 @@ from audit.logger import log_audit
 from ai.logger import log_ai_activity
 
 router = APIRouter(prefix="/imports", tags=["Imports"])
+logger = logging.getLogger(__name__)
 
 
 def _parse_int(value):
@@ -63,98 +67,141 @@ def _calculate_strategy(assessed_value, est_balance):
     return equity, strategy
 
 
+def _extract_csv_lines_from_pdf(file: UploadFile):
+    file.file.seek(0)
+    lines = []
+    with pdfplumber.open(file.file) as pdf:
+        for page in pdf.pages:
+            text = page.extract_text() or ""
+            lines.extend([line.strip() for line in text.splitlines() if line.strip()])
+    return lines
+
+
+def _load_csv_reader(file: UploadFile):
+    if file.filename.lower().endswith(".csv"):
+        decoded = file.file.read().decode("utf-8").splitlines()
+        return csv.DictReader(decoded)
+
+    if file.filename.lower().endswith(".pdf"):
+        lines = _extract_csv_lines_from_pdf(file)
+        return csv.DictReader(lines)
+
+    raise HTTPException(status_code=400, detail="CSV or PDF file required")
+
+
 @router.post("/auction")
 @router.post("/auction-csv")
 def import_auction_csv(
     file: UploadFile = File(...),
     db: Session = Depends(get_db)
 ):
-    decoded = file.file.read().decode("utf-8").splitlines()
-    reader = csv.DictReader(decoded)
-
-    created = 0
-
-    for row in reader:
-        address_line = f"{row.get('address', '')}, {row.get('city', '')}, {row.get('state', '')} {row.get('zip', '')}".strip()
-        latitude, longitude = _geocode_address(address_line)
-
-        prop = Property(
-            external_id=row["external_id"],
-            address=row["address"],
-            city=row["city"],
-            state=row["state"],
-            zip=row["zip"],
-            county=row.get("county"),
-            property_type=row.get("property_type"),
-            year_built=_parse_int(row.get("year_built")),
-            sqft=_parse_int(row.get("sqft")),
-            beds=_parse_float(row.get("beds")),
-            baths=_parse_float(row.get("baths")),
-            assessed_value=_parse_int(row.get("assessed_value")),
-            mortgagor=row.get("mortgagor"),
-            mortgagee=row.get("mortgagee"),
-            trustee=row.get("trustee"),
-            loan_type=row.get("loan_type"),
-            interest_rate=_parse_float(row.get("interest_rate")),
-            orig_loan_amount=_parse_int(row.get("orig_loan_amount")),
-            est_balance=_parse_int(row.get("est_balance")),
-            auction_date=_parse_date(row.get("auction_date")),
-            auction_time=row.get("auction_time"),
-            source=row.get("source"),
-            latitude=latitude,
-            longitude=longitude,
-        )
-        db.add(prop)
-        db.flush()
-
-        case = Case(
-            id=uuid4(),
-            status=CaseStatus.auction_intake,
-            created_by=uuid4(),
-            program_type="FORECLOSURE_PREVENTION",
-            property_id=prop.id,
-        )
-        db.add(case)
-
-        equity, strategy = _calculate_strategy(prop.assessed_value, prop.est_balance)
-        if equity is not None and strategy is not None:
-            ai_score = AIScore(
-                id=uuid4(),
-                case_id=case.id,
-                equity=equity,
-                strategy=strategy,
-                confidence=0.92,
+    try:
+        reader = _load_csv_reader(file)
+        required_headers = {
+            "external_id",
+            "address",
+            "city",
+            "state",
+            "zip",
+            "auction_date",
+            "opening_bid",
+        }
+        incoming_headers = set(reader.fieldnames or [])
+        missing_headers = required_headers - incoming_headers
+        if missing_headers:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Missing required headers: {', '.join(sorted(missing_headers))}",
             )
-            db.add(ai_score)
-            log_ai_activity(
+
+        created = 0
+
+        for row in reader:
+            address_line = f"{row.get('address', '')}, {row.get('city', '')}, {row.get('state', '')} {row.get('zip', '')}".strip()
+            latitude, longitude = _geocode_address(address_line)
+
+            prop = Property(
+                external_id=row["external_id"],
+                address=row["address"],
+                city=row["city"],
+                state=row["state"],
+                zip=row["zip"],
+                county=row.get("county"),
+                property_type=row.get("property_type"),
+                year_built=_parse_int(row.get("year_built")),
+                sqft=_parse_int(row.get("sqft")),
+                beds=_parse_float(row.get("beds")),
+                baths=_parse_float(row.get("baths")),
+                assessed_value=_parse_int(row.get("assessed_value")),
+                mortgagor=row.get("mortgagor"),
+                mortgagee=row.get("mortgagee"),
+                trustee=row.get("trustee"),
+                loan_type=row.get("loan_type"),
+                interest_rate=_parse_float(row.get("interest_rate")),
+                orig_loan_amount=_parse_int(row.get("orig_loan_amount")),
+                est_balance=_parse_int(row.get("est_balance")),
+                auction_date=_parse_date(row.get("auction_date")),
+                auction_time=row.get("auction_time"),
+                source=row.get("source"),
+                latitude=latitude,
+                longitude=longitude,
+            )
+            db.add(prop)
+            db.flush()
+
+            case = Case(
+                id=uuid4(),
+                status=CaseStatus.auction_intake,
+                created_by=uuid4(),
+                program_type="FORECLOSURE_PREVENTION",
+                property_id=prop.id,
+            )
+            db.add(case)
+
+            equity, strategy = _calculate_strategy(prop.assessed_value, prop.est_balance)
+            if equity is not None and strategy is not None:
+                ai_score = AIScore(
+                    id=uuid4(),
+                    case_id=case.id,
+                    equity=equity,
+                    strategy=strategy,
+                    confidence=0.92,
+                )
+                db.add(ai_score)
+                log_ai_activity(
+                    db=db,
+                    case_id=str(case.id),
+                    policy_version_id=None,
+                    ai_role="advisory",
+                    model_provider="rules",
+                    model_name="equity-strategy",
+                    model_version="v1",
+                    prompt_hash="auction_csv_import",
+                    policy_rule_id="auction_strategy_v1",
+                    confidence_score=0.92,
+                )
+
+            log_audit(
                 db=db,
                 case_id=str(case.id),
+                actor_id=None,
+                action_type="auction_property_imported",
+                reason_code="auction_csv_import",
+                before_state={},
+                after_state={
+                    "property_id": str(prop.id),
+                    "external_id": prop.external_id,
+                    "case_status": case.status.value,
+                },
                 policy_version_id=None,
-                ai_role="advisory",
-                model_provider="rules",
-                model_name="equity-strategy",
-                model_version="v1",
-                prompt_hash="auction_csv_import",
-                policy_rule_id="auction_strategy_v1",
-                confidence_score=0.92,
             )
 
-        log_audit(
-            db=db,
-            case_id=str(case.id),
-            actor_id=None,
-            action_type="auction_property_imported",
-            reason_code="auction_csv_import",
-            before_state={},
-            after_state={
-                "property_id": str(prop.id),
-                "external_id": prop.external_id,
-                "case_status": case.status.value,
-            },
-            policy_version_id=None,
-        )
+            created += 1
 
-        created += 1
-
-    db.commit()
-    return {"status": "success", "records_created": created}
+        db.commit()
+        return {"status": "success", "records_created": created}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Auction CSV import failed")
+        raise HTTPException(status_code=500, detail=str(exc))

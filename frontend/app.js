@@ -291,7 +291,12 @@ const handleAuctionImport = async (event) => {
   const form = event.target;
   const fileInput = form.auction_csv;
   if (!fileInput.files.length) {
-    updateResponse("auction-import-response", "Select a CSV file to import.");
+    updateResponse("auction-import-response", "Select a CSV or PDF file to import.");
+    return;
+  }
+  const fileName = fileInput.files[0].name.toLowerCase();
+  if (!fileName.endsWith(".csv") && !fileName.endsWith(".pdf")) {
+    updateResponse("auction-import-response", "CSV or PDF file required.");
     return;
   }
   const formData = new FormData();
@@ -492,7 +497,11 @@ const updateFormValidation = () => {
 
   const auctionForm = document.getElementById("auction-import-form");
   const auctionButton = document.getElementById("auction-import-submit");
-  auctionButton.disabled = auctionForm.auction_csv.files.length === 0;
+  const auctionFile = auctionForm.auction_csv.files[0];
+  auctionButton.disabled =
+    !auctionFile ||
+    (!auctionFile.name.toLowerCase().endsWith(".csv") &&
+      !auctionFile.name.toLowerCase().endsWith(".pdf"));
 
   const consentGrantForm = document.getElementById("consent-grant-form");
   const consentGrantButton = document.getElementById("consent-grant-submit");

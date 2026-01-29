@@ -673,7 +673,13 @@ const wireEvents = () => {
     const fileInput = event.target.csv_file;
     if (!fileInput.files.length) {
       document.getElementById("property-import-hint").textContent =
-        "Select a CSV file to import.";
+        "Select a CSV or PDF file to import.";
+      return;
+    }
+    const fileName = fileInput.files[0].name.toLowerCase();
+    if (!fileName.endsWith(".csv") && !fileName.endsWith(".pdf")) {
+      document.getElementById("property-import-hint").textContent =
+        "CSV or PDF file required.";
       return;
     }
     const formData = new FormData();
