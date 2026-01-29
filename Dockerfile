@@ -11,4 +11,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Command to run Alembic (optional default)
-CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+EXPOSE 8000
+CMD ["sh", "-c", "/app/scripts/run_migrations_once.sh && uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
