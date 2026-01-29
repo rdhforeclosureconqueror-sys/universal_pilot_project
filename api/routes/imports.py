@@ -8,6 +8,7 @@ import json
 
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
 import pdfplumber
+from fastapi import APIRouter, UploadFile, File, Depends
 from sqlalchemy.orm import Session
 
 from db.session import get_db
