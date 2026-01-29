@@ -14,3 +14,4 @@ class Case(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     program_type = Column(String, nullable=True)
     policy_version_id = Column(UUID(as_uuid=True), ForeignKey("policy_versions.id"))
+    property_id = Column(UUID(as_uuid=True), ForeignKey("properties.id"), nullable=True)
