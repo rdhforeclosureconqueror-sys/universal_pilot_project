@@ -13,4 +13,3 @@ COPY . .
 # Command to run Alembic (optional default)
 EXPOSE 8000
 CMD ["sh", "-c", "/app/scripts/run_migrations_once.sh && uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
-CMD ["sh", "-c", "uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

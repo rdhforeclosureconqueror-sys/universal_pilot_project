@@ -114,6 +114,23 @@
       </section>
 
       <section>
+        <h2>Auction CSV Import (Admin Only)</h2>
+        <div class="grid">
+          <div class="card">
+            <h3>Upload Auction CSV</h3>
+            <form id="auction-import-form">
+              <label class="field">
+                <span>CSV File</span>
+                <input type="file" name="auction_csv" accept=".csv" required />
+              </label>
+              <button type="submit" id="auction-import-submit" disabled>Import Auction CSV</button>
+            </form>
+            <pre class="response" id="auction-import-response"></pre>
+          </div>
+        </div>
+      </section>
+
+      <section>
         <h2>Consent Management</h2>
         <div class="grid">
           <div class="card">

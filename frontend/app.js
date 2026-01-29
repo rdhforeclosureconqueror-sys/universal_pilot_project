@@ -2,27 +2,6 @@ const ENUMS = {
   caseStatus: [],
   documentType: [],
   referralStatus: [],
-  caseStatus: [
-    "intake_submitted",
-    "intake_incomplete",
-    "under_review",
-    "in_progress",
-    "program_completed_positive_outcome",
-    "case_closed_other_outcome",
-  ],
-  documentType: [
-    "id_verification",
-    "income_verification",
-    "lease_or_mortgage",
-    "foreclosure_notice",
-    "eviction_notice",
-    "signed_consent",
-    "taskcheck_evidence",
-    "training_proof",
-    "system_doc",
-    "other",
-  ],
-  referralStatus: ["draft", "queued", "sent", "failed", "cancelled"],
   aiRoles: ["assistive", "advisory", "automated"],
 };
 
@@ -307,6 +286,25 @@ const handleDocumentList = async (event) => {
   updateResponse("document-list-response", text);
 };
 
+const handleAuctionImport = async (event) => {
+  event.preventDefault();
+  const form = event.target;
+  const fileInput = form.auction_csv;
+  if (!fileInput.files.length) {
+    updateResponse("auction-import-response", "Select a CSV file to import.");
+    return;
+  }
+  const formData = new FormData();
+  formData.append("file", fileInput.files[0]);
+
+  const response = await fetch(`${getApiBase()}/imports/auction`, {
+    method: "POST",
+    body: formData,
+  });
+  const text = await response.text();
+  updateResponse("auction-import-response", text);
+};
+
 const handleConsentGrant = async (event) => {
   event.preventDefault();
   const form = event.target;
@@ -492,6 +490,10 @@ const updateFormValidation = () => {
   const docListButton = document.getElementById("document-list-submit");
   docListButton.disabled = !validateUuid(docListForm.case_id.value);
 
+  const auctionForm = document.getElementById("auction-import-form");
+  const auctionButton = document.getElementById("auction-import-submit");
+  auctionButton.disabled = auctionForm.auction_csv.files.length === 0;
+
   const consentGrantForm = document.getElementById("consent-grant-form");
   const consentGrantButton = document.getElementById("consent-grant-submit");
   const scopeValue = consentGrantForm.scope.value
@@ -532,6 +534,9 @@ const wireEvents = () => {
   document
     .getElementById("document-list-form")
     .addEventListener("submit", handleDocumentList);
+  document
+    .getElementById("auction-import-form")
+    .addEventListener("submit", handleAuctionImport);
   document
     .getElementById("consent-grant-form")
     .addEventListener("submit", handleConsentGrant);
