@@ -1,3 +1,4 @@
+import logging
 from uuid import uuid4
 
 from sqlalchemy.orm import Session
@@ -5,6 +6,8 @@ from sqlalchemy.orm import Session
 from models.cases import Case
 from models.enums import CaseStatus
 from models.properties import Property
+
+logger = logging.getLogger(__name__)
 
 
 def _get_or_create_property(session: Session, record: dict) -> Property:
@@ -45,3 +48,8 @@ def write_to_db(record: dict, session: Session) -> None:
     )
     session.add(case)
     session.flush()
+    logger.info(
+        "Inserted case for property %s (%s)",
+        prop.id,
+        record.get("case_number"),
+    )

@@ -89,6 +89,10 @@ def import_auction_csv(
             try:
                 created = ingest_pdf(temp_path, db)
                 db.commit()
+                logger.info("Committed Dallas PDF ingestion (%s records)", created)
+            except Exception:
+                db.rollback()
+                raise
             finally:
                 os.unlink(temp_path)
             return {
