@@ -1,0 +1,6 @@
+external_id,address,city,state,zip,county,property_type,year_built,sqft,beds,baths,assessed_value,mortgagor,mortgagee,trustee,loan_type,interest_rate,orig_loan_amount,est_balance,auction_date,auction_time,source
+TX-DAL-0001,14718 Broadview Dr,Balch Springs,TX,75180,Dallas,Single Family,2010,2586,4,3,342870,Kendrick D Rosendoll,Nationstar Mortgage LLC,Auction.com / Beazle,FHA,4.87,148993,107444,2024-12-01,11:00,Roddy FLS
+TX-DAL-0002,14910 Marsha Dr,Balch Springs,TX,75180,Dallas,Single Family,1966,1296,3,1,223960,Andres Del Rio Trejo,Bank of America NA,Bacon Brandy,FHA,4.75,129609,115535,2024-12-01,13:00,Roddy FLS
+TX-DAL-0003,2221 Cristina Cir,Carrollton,TX,75006,Dallas,Single Family,1993,2433,4,3.5,454810,Moshe Almasi,Nationstar Mortgage LLC,Auction.com / Beazle,Fannie Mae,2.9,352000,332223,2024-12-01,10:00,Roddy FLS
+TX-DAL-0004,609 Thorton Ct,Cedar Hill,TX,75104,Dallas,Single Family,1992,1771,3,2,310280,Maria Guardado,Bank of New York Mellon,Auction.com / Beazle,Conventional,,99000,57191,2024-12-01,10:00,Roddy FLS
+TX-DAL-0005,825 Witherspoon Ct,Cedar Hill,TX,75104,Dallas,Single Family,1986,1508,3,2,279440,Natosha Harris,BankUnited NA,Bacon Brandy,FHA,,81809,38337,2024-12-01,10:00,Roddy FLS

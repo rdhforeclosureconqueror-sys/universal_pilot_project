@@ -7,6 +7,7 @@ class CaseStatus(enum.Enum):
     in_progress = "in_progress"
     program_completed_positive_outcome = "program_completed_positive_outcome"
     case_closed_other_outcome = "case_closed_other_outcome"
+    auction_intake = "auction_intake"
 
 class DocumentType(enum.Enum):
     id_verification = "id_verification"
