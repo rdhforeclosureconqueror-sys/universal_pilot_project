@@ -2,7 +2,7 @@ import csv
 import json
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from tempfile import NamedTemporaryFile
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
@@ -18,6 +18,7 @@ from models.properties import Property
 from models.cases import Case
 from models.ai_scores import AIScore
 from models.auction_imports import AuctionImport
+from models.deal_scores import DealScore
 from models.enums import CaseStatus
 from audit.logger import log_audit
 from ai.logger import log_ai_activity
@@ -69,6 +70,46 @@ def _calculate_strategy(assessed_value, est_balance):
     else:
         strategy = "MONITOR_ONLY"
     return equity, strategy
+
+
+def _deal_tier(score: int) -> str:
+    if score >= 80:
+        return "A"
+    if score >= 60:
+        return "B"
+    return "C"
+
+
+def _deal_exit_strategy(equity, urgency_days) -> str:
+    if urgency_days is not None and urgency_days <= 7:
+        return "AUCTION_RUSH"
+    if equity is not None and equity >= 100000:
+        return "HOLD_OR_FLIP"
+    if urgency_days is not None and urgency_days <= 30:
+        return "NEGOTIATE"
+    return "MONITOR"
+
+
+def _deal_score(equity, urgency_days) -> tuple[int, str, str, int | None]:
+    score = 50
+    if equity is not None:
+        if equity >= 150000:
+            score += 30
+        elif equity >= 75000:
+            score += 20
+        elif equity >= 30000:
+            score += 10
+    if urgency_days is not None:
+        if urgency_days <= 7:
+            score += 20
+        elif urgency_days <= 30:
+            score += 10
+        elif urgency_days <= 90:
+            score += 5
+    score = max(0, min(100, score))
+    tier = _deal_tier(score)
+    exit_strategy = _deal_exit_strategy(equity, urgency_days)
+    return score, tier, exit_strategy, urgency_days
 
 
 def _load_csv_reader(file: UploadFile):
@@ -211,6 +252,23 @@ def import_auction_csv(
                     policy_rule_id="auction_strategy_v1",
                     confidence_score=0.92,
                 )
+
+            urgency_days = None
+            if prop.auction_date:
+                urgency_days = (prop.auction_date.replace(tzinfo=timezone.utc) - datetime.now(timezone.utc)).days
+            deal_score_value, tier, exit_strategy, urgency_days = _deal_score(
+                equity, urgency_days
+            )
+            deal_score = DealScore(
+                id=uuid4(),
+                property_id=prop.id,
+                case_id=case.id,
+                score=deal_score_value,
+                tier=tier,
+                exit_strategy=exit_strategy,
+                urgency_days=urgency_days,
+            )
+            db.add(deal_score)
 
             log_audit(
                 db=db,
