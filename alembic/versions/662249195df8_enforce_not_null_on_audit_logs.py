@@ -15,19 +15,21 @@ branch_labels = None
 depends_on = None
 
 def upgrade() -> None:
-    op.alter_column('audit_logs', 'id', nullable=False)
-    op.alter_column('audit_logs', 'case_id', nullable=False)
-    op.alter_column('audit_logs', 'action_type', nullable=False)
-    op.alter_column('audit_logs', 'reason_code', nullable=False)
-    op.alter_column('audit_logs', 'before_json', nullable=False)
-    op.alter_column('audit_logs', 'after_json', nullable=False)
-    op.alter_column('audit_logs', 'created_at', nullable=False)
+    with op.batch_alter_table('audit_logs') as batch_op:
+        batch_op.alter_column('id', existing_type=sa.UUID(), nullable=False)
+        batch_op.alter_column('case_id', existing_type=sa.UUID(), nullable=False)
+        batch_op.alter_column('action_type', existing_type=sa.String(), nullable=False)
+        batch_op.alter_column('reason_code', existing_type=sa.String(), nullable=False)
+        batch_op.alter_column('before_json', existing_type=sa.JSON(), nullable=False)
+        batch_op.alter_column('after_json', existing_type=sa.JSON(), nullable=False)
+        batch_op.alter_column('created_at', existing_type=sa.DateTime(timezone=True), nullable=False)
 
 def downgrade() -> None:
-    op.alter_column('audit_logs', 'id', nullable=True)
-    op.alter_column('audit_logs', 'case_id', nullable=True)
-    op.alter_column('audit_logs', 'action_type', nullable=True)
-    op.alter_column('audit_logs', 'reason_code', nullable=True)
-    op.alter_column('audit_logs', 'before_json', nullable=True)
-    op.alter_column('audit_logs', 'after_json', nullable=True)
-    op.alter_column('audit_logs', 'created_at', nullable=True)
+    with op.batch_alter_table('audit_logs') as batch_op:
+        batch_op.alter_column('id', existing_type=sa.UUID(), nullable=True)
+        batch_op.alter_column('case_id', existing_type=sa.UUID(), nullable=True)
+        batch_op.alter_column('action_type', existing_type=sa.String(), nullable=True)
+        batch_op.alter_column('reason_code', existing_type=sa.String(), nullable=True)
+        batch_op.alter_column('before_json', existing_type=sa.JSON(), nullable=True)
+        batch_op.alter_column('after_json', existing_type=sa.JSON(), nullable=True)
+        batch_op.alter_column('created_at', existing_type=sa.DateTime(timezone=True), nullable=True)
