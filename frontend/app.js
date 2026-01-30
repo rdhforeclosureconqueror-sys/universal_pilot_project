@@ -161,9 +161,11 @@ const getApiBase = () => {
   if (override) {
     return override.endsWith("/") ? override.slice(0, -1) : override;
   }
+
   const configured = window.__API_BASE_URL__ || "";
   return configured.endsWith("/") ? configured.slice(0, -1) : configured;
 };
+
 
 const updateResponse = (targetId, payload) => {
   const el = document.getElementById(targetId);
