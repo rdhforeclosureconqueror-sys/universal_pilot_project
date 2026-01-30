@@ -88,6 +88,7 @@ def import_auction_csv(
                 temp_path = temp_file.name
             try:
                 created = ingest_pdf(temp_path, db)
+                db.commit()
             finally:
                 os.unlink(temp_path)
             return {

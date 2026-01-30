@@ -35,13 +35,13 @@ def _get_or_create_property(session: Session, record: dict) -> Property:
 
 
 def write_to_db(record: dict, session: Session) -> None:
-    with session.begin_nested():
-        prop = _get_or_create_property(session, record)
-        case = Case(
-            id=uuid4(),
-            status=CaseStatus[record["status"]],
-            created_by=uuid4(),
-            program_type="FORECLOSURE_PREVENTION",
-            property_id=prop.id,
-        )
-        session.add(case)
+    prop = _get_or_create_property(session, record)
+    case = Case(
+        id=uuid4(),
+        status=CaseStatus[record["status"]],
+        created_by=uuid4(),
+        program_type="FORECLOSURE_PREVENTION",
+        property_id=prop.id,
+    )
+    session.add(case)
+    session.flush()

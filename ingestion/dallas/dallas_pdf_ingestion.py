@@ -27,9 +27,9 @@ def ingest_pdf(pdf_path: str, db: Session) -> int:
                             normalized.get("case_number"),
                             normalized.get("address"),
                         )
-                        write_to_db(normalized, db)
+                        with db.begin_nested():
+                            write_to_db(normalized, db)
                         created += 1
                     except Exception as exc:
                         log_error(row, exc)
-    db.commit()
     return created
