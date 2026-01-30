@@ -54,6 +54,10 @@ const pages = {
     title: "Audit & AI Activity Logs",
     subtitle: "Compliance transparency and AI governance.",
   },
+  data: {
+    title: "Data Tables",
+    subtitle: "Live tables from BotOps and lead intelligence.",
+  },
 };
 
 const getApiBase = () => {
@@ -99,6 +103,14 @@ const fetchJson = async (url) => {
     throw new Error(`Request failed: ${response.status}`);
   }
   return response.json();
+};
+
+const formatTimestamp = (value) => {
+  if (!value) {
+    return "—";
+  }
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "—" : date.toLocaleString();
 };
 
 const setPage = (pageId) => {
@@ -343,6 +355,96 @@ const renderPropertiesTable = (properties) => {
   });
 };
 
+const renderLeadsTable = (leads) => {
+  const tbody = document.querySelector("#leads-table tbody");
+  tbody.innerHTML = "";
+  document.getElementById("leads-count").textContent = leads.length;
+  if (!leads.length) {
+    document.getElementById("leads-empty").textContent =
+      "No leads have been ingested yet.";
+    return;
+  }
+  document.getElementById("leads-empty").textContent = "";
+  leads.forEach((lead) => {
+    const row = document.createElement("tr");
+    row.innerHTML = `
+      <td>${lead.lead_id || lead.id || "—"}</td>
+      <td>${lead.address || "—"}</td>
+      <td>${lead.city || "—"}</td>
+      <td>${lead.status || "—"}</td>
+      <td>${lead.score ?? "—"}</td>
+    `;
+    tbody.appendChild(row);
+  });
+};
+
+const renderReportsTable = (reports) => {
+  const tbody = document.querySelector("#reports-table tbody");
+  tbody.innerHTML = "";
+  document.getElementById("reports-count").textContent = reports.length;
+  if (!reports.length) {
+    document.getElementById("reports-empty").textContent =
+      "No bot reports logged yet.";
+    return;
+  }
+  document.getElementById("reports-empty").textContent = "";
+  reports.forEach((report) => {
+    const row = document.createElement("tr");
+    row.innerHTML = `
+      <td>${report.bot || "—"}</td>
+      <td>${report.level || "—"}</td>
+      <td>${report.code || "—"}</td>
+      <td>${report.message || "—"}</td>
+      <td>${formatTimestamp(report.created_at)}</td>
+    `;
+    tbody.appendChild(row);
+  });
+};
+
+const renderCommandsTable = (commands) => {
+  const tbody = document.querySelector("#commands-table tbody");
+  tbody.innerHTML = "";
+  document.getElementById("commands-count").textContent = commands.length;
+  if (!commands.length) {
+    document.getElementById("commands-empty").textContent =
+      "No bot commands queued yet.";
+    return;
+  }
+  document.getElementById("commands-empty").textContent = "";
+  commands.forEach((command) => {
+    const row = document.createElement("tr");
+    row.innerHTML = `
+      <td>${command.target_bot || "—"}</td>
+      <td>${command.command || "—"}</td>
+      <td>${command.status || "pending"}</td>
+      <td>${command.priority ?? "—"}</td>
+      <td>${formatTimestamp(command.created_at)}</td>
+    `;
+    tbody.appendChild(row);
+  });
+};
+
+const renderSettingsTable = (settings) => {
+  const tbody = document.querySelector("#settings-table tbody");
+  tbody.innerHTML = "";
+  document.getElementById("settings-count").textContent = settings.length;
+  if (!settings.length) {
+    document.getElementById("settings-empty").textContent =
+      "No bot settings configured yet.";
+    return;
+  }
+  document.getElementById("settings-empty").textContent = "";
+  settings.forEach((setting) => {
+    const row = document.createElement("tr");
+    row.innerHTML = `
+      <td>${setting.key || "—"}</td>
+      <td>${setting.value || "—"}</td>
+      <td>${formatTimestamp(setting.updated_at)}</td>
+    `;
+    tbody.appendChild(row);
+  });
+};
+
 const renderMapPins = (map, properties) => {
   if (!map) {
     return;
@@ -388,6 +490,30 @@ const loadPropertyDetail = async (propertyId, mapInstance) => {
   if (mapInstance && detail.latitude && detail.longitude) {
     mapInstance.setView([detail.latitude, detail.longitude], 14);
     L.marker([detail.latitude, detail.longitude]).addTo(mapInstance);
+  }
+};
+
+const loadBotOpsTables = async () => {
+  try {
+    const dashboard = await fetchJson(`${getApiBase()}/botops/dashboard`);
+    renderLeadsTable(dashboard.leads || []);
+    renderReportsTable(dashboard.reports || []);
+    renderCommandsTable(dashboard.commands || []);
+  } catch (error) {
+    document.getElementById("leads-empty").textContent =
+      "Unable to load BotOps dashboard data.";
+    document.getElementById("reports-empty").textContent =
+      "Unable to load BotOps dashboard data.";
+    document.getElementById("commands-empty").textContent =
+      "Unable to load BotOps dashboard data.";
+  }
+
+  try {
+    const settings = await fetchJson(`${getApiBase()}/botops/settings`);
+    renderSettingsTable(settings || []);
+  } catch (error) {
+    document.getElementById("settings-empty").textContent =
+      "Unable to load BotOps settings.";
   }
 };
 
@@ -792,6 +918,7 @@ const init = async () => {
   updateValidation();
 
   await loadProperties(map);
+  await loadBotOpsTables();
 
   const page = window.location.hash.replace("#/", "");
   setPage(page || "dashboard");

@@ -15,6 +15,12 @@ def normalize_case_number(case_number: str) -> str:
     cleaned = re.sub(r"\s+", " ", case_number.strip())
     return cleaned.upper()
 
+def clean_zip(raw_zip: str) -> str:
+    if raw_zip is None:
+        return ""
+    match = re.search(r"\b(\d{5})\b", str(raw_zip))
+    return match.group(1) if match else ""
+
 
 def parse_date(raw_date: str) -> datetime:
     if raw_date is None:

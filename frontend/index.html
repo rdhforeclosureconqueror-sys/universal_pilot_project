@@ -32,6 +32,7 @@
           <a href="#/referrals" data-page="referrals" class="nav-link">Referrals & Partners</a>
           <a href="#/training" data-page="training" class="nav-link">Training & Certification</a>
           <a href="#/audit" data-page="audit" class="nav-link">Audit & AI Logs</a>
+          <a href="#/data" data-page="data" class="nav-link">Data Tables</a>
           <a href="/static/admin-dev.html" class="nav-link">Admin / Dev Console</a>
         </nav>
         <div class="sidebar-footer">
@@ -410,6 +411,99 @@
             <h3>AI Activity Log Fields</h3>
             <div class="detail-stack" id="ai-log-schema"></div>
             <div class="empty-state" id="ai-log-empty"></div>
+          </div>
+        </section>
+
+        <section class="page" data-page="data">
+          <div class="grid two">
+            <div class="card table-card">
+              <div class="table-header">
+                <div>
+                  <h3>Leads</h3>
+                  <p class="hint">Recent lead intelligence from BotOps ingestion.</p>
+                </div>
+                <span class="pill" id="leads-count">0</span>
+              </div>
+              <div class="empty-state" id="leads-empty"></div>
+              <table class="data-table" id="leads-table">
+                <thead>
+                  <tr>
+                    <th>Lead ID</th>
+                    <th>Address</th>
+                    <th>City</th>
+                    <th>Status</th>
+                    <th>Score</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+            <div class="card table-card">
+              <div class="table-header">
+                <div>
+                  <h3>Bot Reports</h3>
+                  <p class="hint">Recent bot events and pipeline messages.</p>
+                </div>
+                <span class="pill" id="reports-count">0</span>
+              </div>
+              <div class="empty-state" id="reports-empty"></div>
+              <table class="data-table" id="reports-table">
+                <thead>
+                  <tr>
+                    <th>Bot</th>
+                    <th>Level</th>
+                    <th>Code</th>
+                    <th>Message</th>
+                    <th>Created</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="grid two">
+            <div class="card table-card">
+              <div class="table-header">
+                <div>
+                  <h3>Bot Commands</h3>
+                  <p class="hint">Queued bot instructions awaiting execution.</p>
+                </div>
+                <span class="pill" id="commands-count">0</span>
+              </div>
+              <div class="empty-state" id="commands-empty"></div>
+              <table class="data-table" id="commands-table">
+                <thead>
+                  <tr>
+                    <th>Target Bot</th>
+                    <th>Command</th>
+                    <th>Status</th>
+                    <th>Priority</th>
+                    <th>Created</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+            <div class="card table-card">
+              <div class="table-header">
+                <div>
+                  <h3>Bot Settings</h3>
+                  <p class="hint">Operational config values used by runners.</p>
+                </div>
+                <span class="pill" id="settings-count">0</span>
+              </div>
+              <div class="empty-state" id="settings-empty"></div>
+              <table class="data-table" id="settings-table">
+                <thead>
+                  <tr>
+                    <th>Key</th>
+                    <th>Value</th>
+                    <th>Updated</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
           </div>
         </section>
       </main>

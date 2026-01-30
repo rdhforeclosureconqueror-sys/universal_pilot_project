@@ -131,6 +131,29 @@ body {
   grid-column: 1 / -1;
 }
 
+.table-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.table-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.pill {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(99, 102, 241, 0.12);
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid rgba(99, 102, 241, 0.25);
+}
+
 .field {
   display: flex;
   flex-direction: column;
@@ -236,11 +259,19 @@ button:disabled {
   font-size: 14px;
 }
 
+.data-table thead {
+  background: rgba(15, 23, 42, 0.04);
+}
+
 .data-table th,
 .data-table td {
   text-align: left;
   padding: 10px;
   border-bottom: 1px solid var(--border);
+}
+
+.data-table tbody tr:hover {
+  background: rgba(31, 122, 236, 0.06);
 }
 
 .empty-state {
