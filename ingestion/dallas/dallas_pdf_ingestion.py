@@ -21,8 +21,6 @@ def ingest_pdf(pdf_path: str, db: Session) -> int:
                         continue
                     try:
                         record = parse_dallas_row(row)
-                        if record is None:
-                            continue
                         normalized = normalize(record)
                         logger.info(
                             "Persisting Dallas PDF row %s / %s",

@@ -62,6 +62,8 @@ def parse_dallas_row(row: List[str]) -> Optional[dict]:
     if not address or not city or not state or not zip_code or not auction_date:
         raise ValueError("Missing required address, city, state, zip, or auction date")
 
+    
+
     return {
         "address": address,
         "case_number": case_number,
@@ -73,5 +75,5 @@ def parse_dallas_row(row: List[str]) -> Optional[dict]:
         "mortgagor": mortgagor,
         "mortgagee": mortgagee,
         "auction_date": auction_date,
-        "source": source or "dallas_county_pdf",
+        "source": source,
     }

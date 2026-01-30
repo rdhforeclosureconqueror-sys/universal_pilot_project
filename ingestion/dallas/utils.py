@@ -22,12 +22,12 @@ def clean_zip(raw_zip: str) -> str:
     return match.group(1) if match else ""
 
 
-def parse_date(raw_date: str) -> datetime | None:
+def parse_date(raw_date: str) -> datetime:
     if raw_date is None:
-        return None
+        raise ValueError("Missing auction date")
     cleaned = raw_date.strip()
     if not cleaned:
-        return None
+        raise ValueError("Missing auction date")
 
     date_formats = ["%m/%d/%Y", "%m/%d/%y", "%Y-%m-%d", "%B %d, %Y"]
     for fmt in date_formats:
@@ -35,4 +35,4 @@ def parse_date(raw_date: str) -> datetime | None:
             return datetime.strptime(cleaned, fmt)
         except ValueError:
             continue
-    return None
+    raise ValueError(f"Unsupported date format: {raw_date}")
