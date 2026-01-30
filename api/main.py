@@ -1,7 +1,8 @@
 from pathlib import Path
+import os
 
 from fastapi import FastAPI
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from api.routes import ai, auth, bulk_upload, botops, cases, consent, deals, documents, referral, training, imports, properties
@@ -25,6 +26,13 @@ def read_styles():
 @app.get("/app.js")
 def read_app_js():
     return FileResponse(frontend_dir / "app.js")
+
+
+@app.get("/config.js")
+def read_config():
+    api_base = os.getenv("VITE_API_BASE_URL", "").strip()
+    js = f'window.__API_BASE_URL__ = "{api_base}";'
+    return Response(content=js, media_type="application/javascript")
 
 
 app.include_router(ai.router)

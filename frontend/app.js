@@ -157,11 +157,12 @@ const renderSchemaList = (targetId, fields) => {
 };
 
 const getApiBase = () => {
-  const base = apiBaseInput.value.trim();
-  if (!base) {
-    return "";
+  const override = apiBaseInput.value.trim();
+  if (override) {
+    return override.endsWith("/") ? override.slice(0, -1) : override;
   }
-  return base.endsWith("/") ? base.slice(0, -1) : base;
+  const configured = window.__API_BASE_URL__ || "";
+  return configured.endsWith("/") ? configured.slice(0, -1) : configured;
 };
 
 const updateResponse = (targetId, payload) => {
@@ -623,6 +624,9 @@ const wireEvents = () => {
 };
 
 const init = async () => {
+  if (!apiBaseInput.value && window.__API_BASE_URL__) {
+    apiBaseInput.value = window.__API_BASE_URL__;
+  }
   try {
     const openApi = await fetchOpenApi();
     const schemas = openApi.components?.schemas;

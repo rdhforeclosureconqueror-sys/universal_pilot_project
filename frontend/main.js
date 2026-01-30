@@ -61,11 +61,12 @@ const pages = {
 };
 
 const getApiBase = () => {
-  const base = apiBaseInput.value.trim();
-  if (!base) {
-    return "";
+  const override = apiBaseInput.value.trim();
+  if (override) {
+    return override.endsWith("/") ? override.slice(0, -1) : override;
   }
-  return base.endsWith("/") ? base.slice(0, -1) : base;
+  const configured = window.__API_BASE_URL__ || "";
+  return configured.endsWith("/") ? configured.slice(0, -1) : configured;
 };
 
 const fetchOpenApi = async () => {
@@ -960,6 +961,9 @@ const init = async () => {
   const page = window.location.hash.replace("#/", "");
   setPage(page || "dashboard");
   renderCharts();
+  if (!apiBaseInput.value && window.__API_BASE_URL__) {
+    apiBaseInput.value = window.__API_BASE_URL__;
+  }
 
   let openApi = null;
   try {
