@@ -8,8 +8,10 @@ from tempfile import NamedTemporaryFile
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 from uuid import uuid4
+
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
 from sqlalchemy.orm import Session
+
 from db.session import get_db
 from models.properties import Property
 from models.cases import Case
@@ -86,10 +88,19 @@ def import_auction_csv(
                 temp_file.write(file.file.read())
                 temp_path = temp_file.name
             try:
-                ingest_pdf(temp_path)
+                created = ingest_pdf(temp_path, db)
+                db.commit()
+                logger.info("Committed Dallas PDF ingestion (%s records)", created)
+            except Exception:
+                db.rollback()
+                raise
             finally:
                 os.unlink(temp_path)
-            return {"status": "success", "message": "PDF ingestion completed"}
+            return {
+                "status": "success",
+                "message": "PDF ingestion completed",
+                "records_created": created,
+            }
 
         reader = _load_csv_reader(file)
         required_headers = {
