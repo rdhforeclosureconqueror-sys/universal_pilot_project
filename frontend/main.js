@@ -105,6 +105,68 @@ const fetchJson = async (url) => {
   return response.json();
 };
 
+const chartSets = {
+  dashboard: [
+    { title: "Market Pulse", subtitle: "Listings, demand, and equity signals." },
+    { title: "Opportunity Score", subtitle: "AI-ready scoring baseline." },
+    { title: "Pipeline Trend", subtitle: "Cases moving through stages." },
+  ],
+  cases: [
+    { title: "Case Volume", subtitle: "New cases by week." },
+    { title: "Status Mix", subtitle: "Distribution across lifecycle states." },
+  ],
+  properties: [
+    { title: "Intake Velocity", subtitle: "New properties over time." },
+    { title: "Auction Calendar", subtitle: "Upcoming auction windows." },
+  ],
+  map: [
+    { title: "Geo Coverage", subtitle: "ZIP-level distribution." },
+    { title: "Hot Zones", subtitle: "Highest equity clusters." },
+  ],
+  "property-detail": [
+    { title: "Equity Snapshot", subtitle: "Estimated equity vs balance." },
+    { title: "Timeline", subtitle: "Key property milestones." },
+  ],
+  documents: [
+    { title: "Document Status", subtitle: "Pending vs verified evidence." },
+    { title: "Upload Volume", subtitle: "Evidence throughput." },
+  ],
+  referrals: [
+    { title: "Referral Pipeline", subtitle: "Queued vs completed." },
+    { title: "Partner Activity", subtitle: "Top partner outcomes." },
+  ],
+  training: [
+    { title: "Training Progress", subtitle: "Quiz completions." },
+    { title: "Certification Status", subtitle: "Active vs expired." },
+  ],
+  audit: [
+    { title: "Audit Events", subtitle: "Recent compliance activity." },
+    { title: "AI Activity", subtitle: "Model calls and overrides." },
+  ],
+  data: [
+    { title: "BotOps Throughput", subtitle: "Commands processed." },
+    { title: "Command Backlog", subtitle: "Pending automation jobs." },
+  ],
+};
+
+const renderCharts = () => {
+  document.querySelectorAll(".chart-grid").forEach((grid) => {
+    const key = grid.dataset.charts;
+    const items = chartSets[key] || [];
+    grid.innerHTML = "";
+    items.forEach((item) => {
+      const card = document.createElement("div");
+      card.className = "card chart-card";
+      card.innerHTML = `
+        <h3>${item.title}</h3>
+        <p class="hint">${item.subtitle}</p>
+        <div class="chart-placeholder">Chart will render when data is available.</div>
+      `;
+      grid.appendChild(card);
+    });
+  });
+};
+
 const formatTimestamp = (value) => {
   if (!value) {
     return "—";
@@ -861,15 +923,25 @@ const wireEvents = () => {
 };
 
 const init = async () => {
-  const openApi = await fetchOpenApi();
-  state.openApi = openApi;
-  const schemas = openApi.components?.schemas;
-  state.enums.caseStatus = extractEnum(schemas, "CaseStatus");
-  state.enums.documentType = extractEnum(schemas, "DocumentType");
-  state.enums.referralStatus = extractEnum(schemas, "ReferralStatus");
+  const page = window.location.hash.replace("#/", "");
+  setPage(page || "dashboard");
+  renderCharts();
 
-  state.caseListAvailable = detectEndpoint(openApi, "/cases", "get");
-  state.propertyEndpointsAvailable = detectPropertyEndpoints(openApi);
+  let openApi = null;
+  try {
+    openApi = await fetchOpenApi();
+    state.openApi = openApi;
+    const schemas = openApi.components?.schemas;
+    state.enums.caseStatus = extractEnum(schemas, "CaseStatus");
+    state.enums.documentType = extractEnum(schemas, "DocumentType");
+    state.enums.referralStatus = extractEnum(schemas, "ReferralStatus");
+
+    state.caseListAvailable = detectEndpoint(openApi, "/cases", "get");
+    state.propertyEndpointsAvailable = detectPropertyEndpoints(openApi);
+  } catch (error) {
+    document.getElementById("metric-cards").textContent =
+      "Unable to load OpenAPI schema. Check API base URL.";
+  }
 
   populateSelect("doc-type-select", state.enums.documentType);
   populateSelect("case-status-filter", state.enums.caseStatus);
@@ -917,15 +989,28 @@ const init = async () => {
   updateDocumentFields();
   updateValidation();
 
-  await loadProperties(map);
-  await loadBotOpsTables();
+  try {
+    await loadProperties(map);
+  } catch (error) {
+    document.getElementById("property-list-state").textContent =
+      "Unable to load properties. Check API connectivity.";
+  }
 
-  const page = window.location.hash.replace("#/", "");
+  try {
+    await loadBotOpsTables();
+  } catch (error) {
+    document.getElementById("leads-empty").textContent =
+      "Unable to load BotOps tables. Check API connectivity.";
+     }
+   const page = window.location.hash.replace("#/", "");
   setPage(page || "dashboard");
 };
 
 init().catch((error) => {
   document.getElementById("metric-cards").textContent =
-    "Unable to load OpenAPI schema. Check API base URL.";
+    "Unable to initialize dashboard. Check API base URL.";
+  renderCharts();
+  const page = window.location.hash.replace("#/", "");
+  setPage(page || "dashboard");
   console.error(error);
 });

@@ -33,6 +33,24 @@ def _is_header_row(cells: List[str]) -> bool:
     return any(token in lowered for token in HEADER_TOKENS)
 
 
+def _is_noise_row(cells: List[str]) -> bool:
+    tokens = " ".join(cells).upper()
+    if "EQUITY" in tokens or "MARGIN" in tokens:
+        return True
+    return all(
+        any(char.isdigit() for char in cell) and not any(char.isalpha() for char in cell)
+        for cell in cells
+    )
+
+
+def _find_date(cells: List[str]):
+    for cell in cells:
+        parsed = parse_date(cell)
+        if parsed:
+            return parsed
+    return None
+
+
 def parse_dallas_row(row: List[str]) -> Optional[dict]:
     cells = _normalize_row(row)
     if not cells:
@@ -41,28 +59,27 @@ def parse_dallas_row(row: List[str]) -> Optional[dict]:
     if _is_header_row(cells):
         return None
 
-    if len(cells) < EXPECTED_COLUMNS:
-        raise ValueError(
-            f"Expected at least {EXPECTED_COLUMNS} columns, received {len(cells)}"
-        )
+    if _is_noise_row(cells):
+        return None
 
     address = clean_address(_get_cell(cells, 0))
-    city = _get_cell(cells, 1).strip()
-    state = _get_cell(cells, 2).strip()
-    zip_code = clean_zip(_get_cell(cells, 3))
-    county = _get_cell(cells, 4).strip()
-    trustee = _get_cell(cells, 5).strip()
-    mortgagor = _get_cell(cells, 6).strip()
-    mortgagee = _get_cell(cells, 7).strip()
-    auction_date = parse_date(_get_cell(cells, 8))
+    city = _get_cell(cells, 1).strip() if len(cells) > 1 else "Dallas"
+    state = _get_cell(cells, 2).strip() if len(cells) > 2 else "TX"
+    zip_code = clean_zip(_get_cell(cells, 3) if len(cells) > 3 else " ".join(cells))
+    county = _get_cell(cells, 4).strip() if len(cells) > 4 else "Dallas"
+    trustee = _get_cell(cells, 5).strip() if len(cells) > 5 else ""
+    mortgagor = _get_cell(cells, 6).strip() if len(cells) > 6 else ""
+    mortgagee = _get_cell(cells, 7).strip() if len(cells) > 7 else ""
+    auction_date = parse_date(_get_cell(cells, 8)) if len(cells) > 8 else None
     source = _get_cell(cells, 9).strip() if len(cells) > 9 else "dallas_county_pdf"
 
     case_number = normalize_case_number(_get_cell(cells, 10)) if len(cells) > 10 else ""
 
-    if not address or not city or not state or not zip_code or not auction_date:
-        raise ValueError("Missing required address, city, state, zip, or auction date")
+    if not auction_date:
+        auction_date = _find_date(cells)
 
-    
+    if not address or not zip_code or not auction_date:
+        return None
 
     return {
         "address": address,
@@ -75,5 +92,5 @@ def parse_dallas_row(row: List[str]) -> Optional[dict]:
         "mortgagor": mortgagor,
         "mortgagee": mortgagee,
         "auction_date": auction_date,
-        "source": source,
+        "source": source or "dallas_county_pdf",
     }
