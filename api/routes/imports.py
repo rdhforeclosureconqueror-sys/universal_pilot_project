@@ -2,15 +2,14 @@ import csv
 import json
 import logging
 import os
+import pdfplumber
 from datetime import datetime
 from tempfile import NamedTemporaryFile
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 from uuid import uuid4
-
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
 from sqlalchemy.orm import Session
-
 from db.session import get_db
 from models.properties import Property
 from models.cases import Case
