@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from api.routes import ai, auth, bulk_upload, botops, cases, consent, documents, referral, training, imports, properties
+from api.routes import ai, auth, bulk_upload, cases, consent, documents, referral, training, imports, properties
 
 app = FastAPI()
 
@@ -30,7 +30,6 @@ def read_app_js():
 app.include_router(ai.router)
 app.include_router(auth.router)
 app.include_router(bulk_upload.router)
-app.include_router(botops.router)
 app.include_router(cases.router)
 app.include_router(consent.router)
 app.include_router(documents.router)
