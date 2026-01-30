@@ -94,7 +94,7 @@ const apiBaseInput = document.getElementById("api-base");
 
 const listCaseStatuses = () => {
   const list = document.getElementById("case-status-list");
-  list.innerHTML = "";
+  list.replaceChildren();
   if (!ENUMS.caseStatus.length) {
     const li = document.createElement("li");
     li.textContent = "No CaseStatus enum found in OpenAPI.";
@@ -110,7 +110,7 @@ const listCaseStatuses = () => {
 
 const listReferralStatuses = () => {
   const list = document.getElementById("referral-status-list");
-  list.innerHTML = "";
+  list.replaceChildren();
   if (!ENUMS.referralStatus.length) {
     const li = document.createElement("li");
     li.textContent = "No ReferralStatus enum found in OpenAPI.";
@@ -126,7 +126,7 @@ const listReferralStatuses = () => {
 
 const populateSelect = (selectId, values) => {
   const select = document.getElementById(selectId);
-  select.innerHTML = "";
+  select.replaceChildren();
   if (!values.length) {
     const option = document.createElement("option");
     option.value = "";
@@ -146,7 +146,7 @@ const populateSelect = (selectId, values) => {
 
 const renderSchemaList = (targetId, fields) => {
   const container = document.getElementById(targetId);
-  container.innerHTML = "";
+  container.replaceChildren();
   const list = document.createElement("ul");
   fields.forEach((field) => {
     const li = document.createElement("li");
@@ -323,7 +323,7 @@ const handleAuctionImport = async (event) => {
 const loadAuctionImports = async () => {
   const tableBody = document.querySelector("#auction-import-table tbody");
   const empty = document.getElementById("auction-import-empty");
-  tableBody.innerHTML = "";
+  tableBody.replaceChildren();
   empty.textContent = "";
 
   try {
@@ -344,14 +344,18 @@ const loadAuctionImports = async () => {
       downloadLink.target = "_blank";
       downloadLink.rel = "noopener noreferrer";
 
-      row.innerHTML = `
-        <td>${item.filename || "—"}</td>
-        <td>${item.status || "—"}</td>
-        <td>${item.records_created ?? "—"}</td>
-        <td>${formatTimestamp(item.uploaded_at)}</td>
-        <td></td>
-      `;
-      row.querySelector("td:last-child").appendChild(downloadLink);
+      const filenameCell = document.createElement("td");
+      filenameCell.textContent = item.filename || "—";
+      const statusCell = document.createElement("td");
+      statusCell.textContent = item.status || "—";
+      const recordsCell = document.createElement("td");
+      recordsCell.textContent = item.records_created ?? "—";
+      const uploadedCell = document.createElement("td");
+      uploadedCell.textContent = formatTimestamp(item.uploaded_at);
+      const downloadCell = document.createElement("td");
+      downloadCell.appendChild(downloadLink);
+
+      row.append(filenameCell, statusCell, recordsCell, uploadedCell, downloadCell);
       tableBody.appendChild(row);
     });
   } catch (error) {
