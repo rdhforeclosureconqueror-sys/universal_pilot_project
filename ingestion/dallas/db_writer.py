@@ -3,6 +3,7 @@ from uuid import uuid4
 
 from sqlalchemy.orm import Session
 
+from db.session import SessionLocal
 from models.cases import Case
 from models.enums import CaseStatus
 from models.properties import Property

@@ -2,6 +2,7 @@ import csv
 import json
 import logging
 import os
+import pdfplumber
 from datetime import datetime
 from tempfile import NamedTemporaryFile
 from urllib.parse import urlencode
