@@ -173,10 +173,15 @@ def import_auction_csv(
         # CSV handling logic would go below if you support it
 
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise HTTPException(
+    status_code=500,
+    detail={
+        "error": str(exc),
+        "import_id": str(auction_import.id),
+    }
+)
 
-                "import_id": str(auction_import.id),
-            }
+            
 
         reader = _load_csv_reader(file)
         required_headers = {
