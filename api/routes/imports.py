@@ -1,16 +1,15 @@
 import csv
+import json
 import logging
+import os
+import pdfplumber
 from datetime import datetime
-from uuid import uuid4
+from tempfile import NamedTemporaryFile
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
-import json
-
+from uuid import uuid4
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
-import pdfplumber
-from fastapi import APIRouter, UploadFile, File, Depends
 from sqlalchemy.orm import Session
-
 from db.session import get_db
 from models.properties import Property
 from models.cases import Case
@@ -18,6 +17,7 @@ from models.ai_scores import AIScore
 from models.enums import CaseStatus
 from audit.logger import log_audit
 from ai.logger import log_ai_activity
+from ingestion.dallas.dallas_pdf_ingestion import ingest_pdf
 
 router = APIRouter(prefix="/imports", tags=["Imports"])
 logger = logging.getLogger(__name__)
@@ -67,26 +67,11 @@ def _calculate_strategy(assessed_value, est_balance):
     return equity, strategy
 
 
-def _extract_csv_lines_from_pdf(file: UploadFile):
-    file.file.seek(0)
-    lines = []
-    with pdfplumber.open(file.file) as pdf:
-        for page in pdf.pages:
-            text = page.extract_text() or ""
-            lines.extend([line.strip() for line in text.splitlines() if line.strip()])
-    return lines
-
-
 def _load_csv_reader(file: UploadFile):
-    if file.filename.lower().endswith(".csv"):
-        decoded = file.file.read().decode("utf-8").splitlines()
-        return csv.DictReader(decoded)
-
-    if file.filename.lower().endswith(".pdf"):
-        lines = _extract_csv_lines_from_pdf(file)
-        return csv.DictReader(lines)
-
-    raise HTTPException(status_code=400, detail="CSV or PDF file required")
+    if not file.filename.lower().endswith(".csv"):
+        raise HTTPException(status_code=400, detail="CSV file required")
+    decoded = file.file.read().decode("utf-8").splitlines()
+    return csv.DictReader(decoded)
 
 
 @router.post("/auction")
@@ -96,6 +81,16 @@ def import_auction_csv(
     db: Session = Depends(get_db)
 ):
     try:
+        if file.filename.lower().endswith(".pdf"):
+            with NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
+                temp_file.write(file.file.read())
+                temp_path = temp_file.name
+            try:
+                ingest_pdf(temp_path)
+            finally:
+                os.unlink(temp_path)
+            return {"status": "success", "message": "PDF ingestion completed"}
+
         reader = _load_csv_reader(file)
         required_headers = {
             "external_id",
