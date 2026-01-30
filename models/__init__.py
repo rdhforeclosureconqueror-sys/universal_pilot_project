@@ -13,3 +13,12 @@ from .outbox_queue import OutboxQueue
 from .ai_activity_logs import AIActivityLog
 from .properties import Property
 from .ai_scores import AIScore
+from .botops import (
+    BotSetting,
+    BotReport,
+    BotCommand,
+    BotTrigger,
+    BotInboundLog,
+    BotPage,
+    Lead,
+)
