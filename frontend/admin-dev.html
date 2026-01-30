@@ -123,9 +123,26 @@
                 <span>CSV or PDF File (.csv, .pdf)</span>
                 <input type="file" name="auction_csv" accept=".csv,.pdf" required />
               </label>
-              <button type="submit" id="auction-import-submit" disabled>Import Auction CSV</button>
+              <button type="submit" id="auction-import-submit" disabled>Import Auction File</button>
             </form>
             <pre class="response" id="auction-import-response"></pre>
+          </div>
+          <div class="card">
+            <h3>Recent Auction Imports</h3>
+            <p class="hint">Uploaded PDFs are stored and can be downloaded here.</p>
+            <table class="data-table" id="auction-import-table">
+              <thead>
+                <tr>
+                  <th>Filename</th>
+                  <th>Status</th>
+                  <th>Records</th>
+                  <th>Uploaded</th>
+                  <th>Download</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+            <p class="hint" id="auction-import-empty"></p>
           </div>
         </div>
       </section>
@@ -268,6 +285,7 @@
       </section>
     </main>
 
+    <script src="/config.js"></script>
     <script type="module" src="/static/app.js"></script>
   </body>
 </html>

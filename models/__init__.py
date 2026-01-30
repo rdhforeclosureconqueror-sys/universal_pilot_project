@@ -13,6 +13,8 @@ from .outbox_queue import OutboxQueue
 from .ai_activity_logs import AIActivityLog
 from .properties import Property
 from .ai_scores import AIScore
+from .auction_imports import AuctionImport
+from .deal_scores import DealScore
 from .botops import (
     BotSetting,
     BotReport,

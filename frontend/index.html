@@ -66,6 +66,24 @@
               <ul id="case-status-summary" class="status-list"></ul>
             </div>
           </div>
+          <div class="card full">
+            <h3>Top Deals (Platinum View)</h3>
+            <div class="empty-state" id="top-deals-empty"></div>
+            <table class="data-table" id="top-deals-table">
+              <thead>
+                <tr>
+                  <th>Score</th>
+                  <th>Tier</th>
+                  <th>Address</th>
+                  <th>Auction Date</th>
+                  <th>Urgency (days)</th>
+                  <th>Exit Strategy</th>
+                  <th>Case Status</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
           <div class="grid two">
             <div class="card">
               <h3>Alerts & Blocks</h3>
@@ -519,6 +537,7 @@
       </main>
     </div>
 
+    <script src="/config.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
       integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
       crossorigin=""></script>

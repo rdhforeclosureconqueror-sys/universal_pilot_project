@@ -3,19 +3,23 @@ import json
 import logging
 import os
 import pdfplumber
-from datetime import datetime
+from datetime import datetime, timezone
 from tempfile import NamedTemporaryFile
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 from uuid import uuid4
 
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
+from io import BytesIO
 
 from db.session import get_db
 from models.properties import Property
 from models.cases import Case
 from models.ai_scores import AIScore
+from models.auction_imports import AuctionImport
+from models.deal_scores import DealScore
 from models.enums import CaseStatus
 from audit.logger import log_audit
 from ai.logger import log_ai_activity
@@ -69,6 +73,46 @@ def _calculate_strategy(assessed_value, est_balance):
     return equity, strategy
 
 
+def _deal_tier(score: int) -> str:
+    if score >= 80:
+        return "A"
+    if score >= 60:
+        return "B"
+    return "C"
+
+
+def _deal_exit_strategy(equity, urgency_days) -> str:
+    if urgency_days is not None and urgency_days <= 7:
+        return "AUCTION_RUSH"
+    if equity is not None and equity >= 100000:
+        return "HOLD_OR_FLIP"
+    if urgency_days is not None and urgency_days <= 30:
+        return "NEGOTIATE"
+    return "MONITOR"
+
+
+def _deal_score(equity, urgency_days) -> tuple[int, str, str, int | None]:
+    score = 50
+    if equity is not None:
+        if equity >= 150000:
+            score += 30
+        elif equity >= 75000:
+            score += 20
+        elif equity >= 30000:
+            score += 10
+    if urgency_days is not None:
+        if urgency_days <= 7:
+            score += 20
+        elif urgency_days <= 30:
+            score += 10
+        elif urgency_days <= 90:
+            score += 5
+    score = max(0, min(100, score))
+    tier = _deal_tier(score)
+    exit_strategy = _deal_exit_strategy(equity, urgency_days)
+    return score, tier, exit_strategy, urgency_days
+
+
 def _load_csv_reader(file: UploadFile):
     if not file.filename.lower().endswith(".csv"):
         raise HTTPException(status_code=400, detail="CSV file required")
@@ -76,30 +120,62 @@ def _load_csv_reader(file: UploadFile):
     return csv.DictReader(decoded)
 
 
-@router.post("/auction")
+
+ @router.post("/auction")
 @router.post("/auction-csv")
 def import_auction_csv(
     file: UploadFile = File(...),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     try:
         if file.filename.lower().endswith(".pdf"):
+            file_bytes = file.file.read()
+            auction_import = AuctionImport(
+                filename=file.filename,
+                content_type=file.content_type,
+                file_type="pdf",
+                status="received",
+            )
+            db.add(auction_import)
+            db.commit()
+            db.refresh(auction_import)
+
             with NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
-                temp_file.write(file.file.read())
+                temp_file.write(file_bytes)
                 temp_path = temp_file.name
+
             try:
                 created = ingest_pdf(temp_path, db)
+                auction_import.status = "processed"
+                auction_import.records_created = created
                 db.commit()
                 logger.info("Committed Dallas PDF ingestion (%s records)", created)
-            except Exception:
+            except Exception as exc:
                 db.rollback()
-                raise
+                failed = (
+                    db.query(AuctionImport)
+                    .filter(AuctionImport.id == auction_import.id)
+                    .first()
+                )
+                if failed:
+                    failed.status = "failed"
+                    failed.error_message = str(exc)
+                    db.commit()
             finally:
                 os.unlink(temp_path)
+
             return {
                 "status": "success",
                 "message": "PDF ingestion completed",
                 "records_created": created,
+            }
+
+        # CSV handling logic would go below if you support it
+
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+                "import_id": str(auction_import.id),
             }
 
         reader = _load_csv_reader(file)
@@ -187,6 +263,23 @@ def import_auction_csv(
                     confidence_score=0.92,
                 )
 
+            urgency_days = None
+            if prop.auction_date:
+                urgency_days = (prop.auction_date.replace(tzinfo=timezone.utc) - datetime.now(timezone.utc)).days
+            deal_score_value, tier, exit_strategy, urgency_days = _deal_score(
+                equity, urgency_days
+            )
+            deal_score = DealScore(
+                id=uuid4(),
+                property_id=prop.id,
+                case_id=case.id,
+                score=deal_score_value,
+                tier=tier,
+                exit_strategy=exit_strategy,
+                urgency_days=urgency_days,
+            )
+            db.add(deal_score)
+
             log_audit(
                 db=db,
                 case_id=str(case.id),
@@ -211,3 +304,39 @@ def import_auction_csv(
     except Exception as exc:
         logger.exception("Auction CSV import failed")
         raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.get("/auction-files")
+def list_auction_files(limit: int = 50, db: Session = Depends(get_db)):
+    imports = (
+        db.query(AuctionImport)
+        .order_by(AuctionImport.uploaded_at.desc())
+        .limit(limit)
+        .all()
+    )
+    return [
+        {
+            "id": str(item.id),
+            "filename": item.filename,
+            "content_type": item.content_type,
+            "status": item.status,
+            "records_created": item.records_created,
+            "error_message": item.error_message,
+            "uploaded_at": item.uploaded_at,
+        }
+        for item in imports
+    ]
+
+
+@router.get("/auction-files/{import_id}")
+def download_auction_file(import_id: str, db: Session = Depends(get_db)):
+    record = db.query(AuctionImport).filter(AuctionImport.id == import_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="Import not found")
+    return StreamingResponse(
+        BytesIO(record.file_bytes),
+        media_type=record.content_type or "application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{record.filename}"'
+        },
+    )

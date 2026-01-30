@@ -61,11 +61,12 @@ const pages = {
 };
 
 const getApiBase = () => {
-  const base = apiBaseInput.value.trim();
-  if (!base) {
-    return "";
+  const override = apiBaseInput.value.trim();
+  if (override) {
+    return override.endsWith("/") ? override.slice(0, -1) : override;
   }
-  return base.endsWith("/") ? base.slice(0, -1) : base;
+  const configured = window.__API_BASE_URL__ || "";
+  return configured.endsWith("/") ? configured.slice(0, -1) : configured;
 };
 
 const fetchOpenApi = async () => {
@@ -417,6 +418,30 @@ const renderPropertiesTable = (properties) => {
   });
 };
 
+const renderTopDeals = (deals) => {
+  const tbody = document.querySelector("#top-deals-table tbody");
+  tbody.innerHTML = "";
+  if (!deals.length) {
+    document.getElementById("top-deals-empty").textContent =
+      "No ranked deals available yet. Import auction data to generate scores.";
+    return;
+  }
+  document.getElementById("top-deals-empty").textContent = "";
+  deals.forEach((deal) => {
+    const row = document.createElement("tr");
+    row.innerHTML = `
+      <td>${deal.score ?? "—"}</td>
+      <td>${deal.tier || "—"}</td>
+      <td>${deal.address || "—"}</td>
+      <td>${deal.auction_date ? new Date(deal.auction_date).toLocaleDateString() : "—"}</td>
+      <td>${deal.urgency_days ?? "—"}</td>
+      <td>${deal.exit_strategy || "—"}</td>
+      <td>${deal.case_status || "—"}</td>
+    `;
+    tbody.appendChild(row);
+  });
+};
+
 const renderLeadsTable = (leads) => {
   const tbody = document.querySelector("#leads-table tbody");
   tbody.innerHTML = "";
@@ -576,6 +601,16 @@ const loadBotOpsTables = async () => {
   } catch (error) {
     document.getElementById("settings-empty").textContent =
       "Unable to load BotOps settings.";
+  }
+};
+
+const loadTopDeals = async () => {
+  try {
+    const deals = await fetchJson(`${getApiBase()}/deals/top`);
+    renderTopDeals(deals || []);
+  } catch (error) {
+    document.getElementById("top-deals-empty").textContent =
+      "Unable to load top deals. Check API connectivity.";
   }
 };
 
@@ -926,6 +961,9 @@ const init = async () => {
   const page = window.location.hash.replace("#/", "");
   setPage(page || "dashboard");
   renderCharts();
+  if (!apiBaseInput.value && window.__API_BASE_URL__) {
+    apiBaseInput.value = window.__API_BASE_URL__;
+  }
 
   let openApi = null;
   try {
@@ -995,6 +1033,8 @@ const init = async () => {
     document.getElementById("property-list-state").textContent =
       "Unable to load properties. Check API connectivity.";
   }
+
+  await loadTopDeals();
 
   try {
     await loadBotOpsTables();

@@ -94,7 +94,7 @@ const apiBaseInput = document.getElementById("api-base");
 
 const listCaseStatuses = () => {
   const list = document.getElementById("case-status-list");
-  list.innerHTML = "";
+  list.replaceChildren();
   if (!ENUMS.caseStatus.length) {
     const li = document.createElement("li");
     li.textContent = "No CaseStatus enum found in OpenAPI.";
@@ -110,7 +110,7 @@ const listCaseStatuses = () => {
 
 const listReferralStatuses = () => {
   const list = document.getElementById("referral-status-list");
-  list.innerHTML = "";
+  list.replaceChildren();
   if (!ENUMS.referralStatus.length) {
     const li = document.createElement("li");
     li.textContent = "No ReferralStatus enum found in OpenAPI.";
@@ -126,7 +126,7 @@ const listReferralStatuses = () => {
 
 const populateSelect = (selectId, values) => {
   const select = document.getElementById(selectId);
-  select.innerHTML = "";
+  select.replaceChildren();
   if (!values.length) {
     const option = document.createElement("option");
     option.value = "";
@@ -146,7 +146,7 @@ const populateSelect = (selectId, values) => {
 
 const renderSchemaList = (targetId, fields) => {
   const container = document.getElementById(targetId);
-  container.innerHTML = "";
+  container.replaceChildren();
   const list = document.createElement("ul");
   fields.forEach((field) => {
     const li = document.createElement("li");
@@ -157,16 +157,25 @@ const renderSchemaList = (targetId, fields) => {
 };
 
 const getApiBase = () => {
-  const base = apiBaseInput.value.trim();
-  if (!base) {
-    return "";
+  const override = apiBaseInput.value.trim();
+  if (override) {
+    return override.endsWith("/") ? override.slice(0, -1) : override;
   }
-  return base.endsWith("/") ? base.slice(0, -1) : base;
+  const configured = window.__API_BASE_URL__ || "";
+  return configured.endsWith("/") ? configured.slice(0, -1) : configured;
 };
 
 const updateResponse = (targetId, payload) => {
   const el = document.getElementById(targetId);
   el.textContent = payload;
+};
+
+const formatTimestamp = (value) => {
+  if (!value) {
+    return "—";
+  }
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "—" : date.toLocaleString();
 };
 
 const fetchOpenApi = async () => {
@@ -308,6 +317,50 @@ const handleAuctionImport = async (event) => {
   });
   const text = await response.text();
   updateResponse("auction-import-response", text);
+  loadAuctionImports();
+};
+
+const loadAuctionImports = async () => {
+  const tableBody = document.querySelector("#auction-import-table tbody");
+  const empty = document.getElementById("auction-import-empty");
+  tableBody.replaceChildren();
+  empty.textContent = "";
+
+  try {
+    const response = await fetch(`${getApiBase()}/imports/auction-files`);
+    if (!response.ok) {
+      throw new Error("Unable to load auction imports.");
+    }
+    const imports = await response.json();
+    if (!imports.length) {
+      empty.textContent = "No auction imports uploaded yet.";
+      return;
+    }
+    imports.forEach((item) => {
+      const row = document.createElement("tr");
+      const downloadLink = document.createElement("a");
+      downloadLink.href = `${getApiBase()}/imports/auction-files/${item.id}`;
+      downloadLink.textContent = "Download";
+      downloadLink.target = "_blank";
+      downloadLink.rel = "noopener noreferrer";
+
+      const filenameCell = document.createElement("td");
+      filenameCell.textContent = item.filename || "—";
+      const statusCell = document.createElement("td");
+      statusCell.textContent = item.status || "—";
+      const recordsCell = document.createElement("td");
+      recordsCell.textContent = item.records_created ?? "—";
+      const uploadedCell = document.createElement("td");
+      uploadedCell.textContent = formatTimestamp(item.uploaded_at);
+      const downloadCell = document.createElement("td");
+      downloadCell.appendChild(downloadLink);
+
+      row.append(filenameCell, statusCell, recordsCell, uploadedCell, downloadCell);
+      tableBody.appendChild(row);
+    });
+  } catch (error) {
+    empty.textContent = "Unable to load auction imports.";
+  }
 };
 
 const handleConsentGrant = async (event) => {
@@ -575,6 +628,9 @@ const wireEvents = () => {
 };
 
 const init = async () => {
+  if (!apiBaseInput.value && window.__API_BASE_URL__) {
+    apiBaseInput.value = window.__API_BASE_URL__;
+  }
   try {
     const openApi = await fetchOpenApi();
     const schemas = openApi.components?.schemas;
@@ -602,6 +658,7 @@ const init = async () => {
   updateDocumentFields();
   wireEvents();
   updateFormValidation();
+  loadAuctionImports();
 };
 
 init();
