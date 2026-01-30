@@ -121,7 +121,7 @@ def _load_csv_reader(file: UploadFile):
 
 
 
- @router.post("/auction")
+@router.post("/auction")
 @router.post("/auction-csv")
 def import_auction_csv(
     file: UploadFile = File(...),
