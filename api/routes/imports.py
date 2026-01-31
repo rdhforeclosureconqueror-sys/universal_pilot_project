@@ -2,6 +2,7 @@ import csv
 import json
 import logging
 import os
+import pdfplumber
 from datetime import datetime, timezone
 from tempfile import NamedTemporaryFile
 from urllib.parse import urlencode
@@ -123,7 +124,7 @@ def _load_csv_reader(file: UploadFile):
 @router.post("/auction-csv")
 def import_auction_csv(
     file: UploadFile = File(...),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     try:
         if file.filename.lower().endswith(".pdf"):
@@ -132,6 +133,7 @@ def import_auction_csv(
                 filename=file.filename,
                 content_type=file.content_type,
                 file_bytes=file_bytes,
+                file_type="pdf",
                 status="received",
             )
             db.add(auction_import)
@@ -158,15 +160,27 @@ def import_auction_csv(
                     failed.status = "failed"
                     failed.error_message = str(exc)
                     db.commit()
-                raise
             finally:
                 os.unlink(temp_path)
+
             return {
                 "status": "success",
                 "message": "PDF ingestion completed",
                 "records_created": created,
-                "import_id": str(auction_import.id),
             }
+
+        # CSV handling logic would go below if you support it
+
+    except Exception as exc:
+        raise HTTPException(
+    status_code=500,
+    detail={
+        "error": str(exc),
+        "import_id": str(auction_import.id),
+    }
+)
+
+            
 
         reader = _load_csv_reader(file)
         required_headers = {

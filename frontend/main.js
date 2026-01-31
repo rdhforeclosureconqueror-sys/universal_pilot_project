@@ -1085,7 +1085,9 @@ const init = async () => {
   } catch (error) {
     document.getElementById("leads-empty").textContent =
       "Unable to load BotOps tables. Check API connectivity.";
-  }
+     }
+   const page = window.location.hash.replace("#/", "");
+  setPage(page || "dashboard");
 };
 
 init().catch((error) => {

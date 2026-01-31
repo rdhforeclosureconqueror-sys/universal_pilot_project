@@ -1,13 +1,23 @@
+# =========================
 # Python bytecode
+# =========================
 __pycache__/
 *.pyc
 *.pyo
+*.pyd
 
+# =========================
 # Pytest
+# =========================
 .pytest_cache/
 
+# =========================
 # Alembic bytecode
+# =========================
 alembic/versions/__pycache__/
 
-# Environment
+# =========================
+# Environment / Secrets
+# =========================
 .env
+.env.*
