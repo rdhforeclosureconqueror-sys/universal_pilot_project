@@ -629,10 +629,12 @@ const wireEvents = () => {
   });
 };
 
-const init = async () => {
-  if (!apiBaseInput.value && window.__API_BASE_URL__) {
-    apiBaseInput.value = window.__API_BASE_URL__;
+    const initapp = async () => {
+     if (!apiBaseInput.value && window.__API_BASE_URL__) {
+       apiBaseInput.value = window.__API_BASE_URL__;
   }
+
+  
   try {
     const openApi = await fetchOpenApi();
     const schemas = openApi.components?.schemas;
