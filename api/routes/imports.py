@@ -120,7 +120,6 @@ def _load_csv_reader(file: UploadFile):
     return csv.DictReader(decoded)
 
 
-
 @router.post("/auction")
 @router.post("/auction-csv")
 def import_auction_csv(
@@ -133,6 +132,7 @@ def import_auction_csv(
             auction_import = AuctionImport(
                 filename=file.filename,
                 content_type=file.content_type,
+                file_bytes=file_bytes,
                 file_type="pdf",
                 status="received",
             )
@@ -143,7 +143,6 @@ def import_auction_csv(
             with NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
                 temp_file.write(file_bytes)
                 temp_path = temp_file.name
-
             try:
                 created = ingest_pdf(temp_path, db)
                 auction_import.status = "processed"

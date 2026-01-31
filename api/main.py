@@ -7,7 +7,6 @@ from fastapi.staticfiles import StaticFiles
 
 from api.routes import ai, auth, bulk_upload, botops, cases, consent, deals, documents, referral, training, imports, properties
 
-
 app = FastAPI()
 
 frontend_dir = Path(__file__).resolve().parent.parent / "frontend"

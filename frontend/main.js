@@ -106,6 +106,26 @@ const fetchJson = async (url) => {
   return response.json();
 };
 
+const clearElement = (element) => {
+  element.replaceChildren();
+};
+
+const createCell = (value) => {
+  const cell = document.createElement("td");
+  cell.textContent = value ?? "—";
+  return cell;
+};
+
+const createPanel = (label, value) => {
+  const panel = document.createElement("div");
+  panel.className = "panel";
+  const strong = document.createElement("strong");
+  strong.textContent = `${label}:`;
+  panel.appendChild(strong);
+  panel.append(` ${value ?? "—"}`);
+  return panel;
+};
+
 const chartSets = {
   dashboard: [
     { title: "Market Pulse", subtitle: "Listings, demand, and equity signals." },
@@ -154,15 +174,19 @@ const renderCharts = () => {
   document.querySelectorAll(".chart-grid").forEach((grid) => {
     const key = grid.dataset.charts;
     const items = chartSets[key] || [];
-    grid.innerHTML = "";
+    clearElement(grid);
     items.forEach((item) => {
       const card = document.createElement("div");
       card.className = "card chart-card";
-      card.innerHTML = `
-        <h3>${item.title}</h3>
-        <p class="hint">${item.subtitle}</p>
-        <div class="chart-placeholder">Chart will render when data is available.</div>
-      `;
+      const title = document.createElement("h3");
+      title.textContent = item.title;
+      const hint = document.createElement("p");
+      hint.className = "hint";
+      hint.textContent = item.subtitle;
+      const placeholder = document.createElement("div");
+      placeholder.className = "chart-placeholder";
+      placeholder.textContent = "Chart will render when data is available.";
+      card.append(title, hint, placeholder);
       grid.appendChild(card);
     });
   });
@@ -207,7 +231,7 @@ const validateJson = (value) => {
 
 const updateMetrics = () => {
   const metrics = document.getElementById("metric-cards");
-  metrics.innerHTML = "";
+  clearElement(metrics);
 
   const items = [
     { label: "Active Cases", value: "—" },
@@ -219,31 +243,41 @@ const updateMetrics = () => {
   items.forEach((item) => {
     const card = document.createElement("div");
     card.className = "metric";
-    card.innerHTML = `<span>${item.label}</span><strong>${item.value}</strong>`;
+    const label = document.createElement("span");
+    label.textContent = item.label;
+    const value = document.createElement("strong");
+    value.textContent = item.value;
+    card.append(label, value);
     metrics.appendChild(card);
   });
 };
 
 const updateStatusSummary = () => {
   const summary = document.getElementById("case-status-summary");
-  summary.innerHTML = "";
+  clearElement(summary);
 
   if (!state.enums.caseStatus.length) {
-    summary.innerHTML = "<li>No CaseStatus enum available from OpenAPI.</li>";
+    const li = document.createElement("li");
+    li.textContent = "No CaseStatus enum available from OpenAPI.";
+    summary.appendChild(li);
     return;
   }
 
   state.enums.caseStatus.forEach((status) => {
     const li = document.createElement("li");
     li.className = "status-pill";
-    li.innerHTML = `<span>${status}</span><strong>—</strong>`;
+    const label = document.createElement("span");
+    label.textContent = status;
+    const value = document.createElement("strong");
+    value.textContent = "—";
+    li.append(label, value);
     summary.appendChild(li);
   });
 };
 
 const updateBlockedActions = () => {
   const blocked = document.getElementById("blocked-actions");
-  blocked.innerHTML = "";
+  clearElement(blocked);
 
   const items = [
     "Referral queueing requires active consent scope 'referral'.",
@@ -259,7 +293,7 @@ const updateBlockedActions = () => {
 
 const updateQuickLinks = () => {
   const container = document.getElementById("quick-links");
-  container.innerHTML = "";
+  clearElement(container);
   [
     { label: "Go to Case Management", href: "#/cases" },
     { label: "Open Document Management", href: "#/documents" },
@@ -274,7 +308,7 @@ const updateQuickLinks = () => {
 
 const populateSelect = (selectId, values) => {
   const select = document.getElementById(selectId);
-  select.innerHTML = "";
+  clearElement(select);
   if (!values.length) {
     const option = document.createElement("option");
     option.value = "";
@@ -397,7 +431,7 @@ const initDetailMap = () => {
 
 const renderPropertiesTable = (properties) => {
   const tbody = document.querySelector("#property-list-table tbody");
-  tbody.innerHTML = "";
+  clearElement(tbody);
   if (!properties.length) {
     document.getElementById("property-list-state").textContent =
       "No properties found yet. Import auction CSV data to get started.";
@@ -406,21 +440,21 @@ const renderPropertiesTable = (properties) => {
   document.getElementById("property-list-state").textContent = "";
   properties.forEach((prop) => {
     const row = document.createElement("tr");
-    row.innerHTML = `
-      <td>${prop.address || "—"}</td>
-      <td>${prop.city || "—"}</td>
-      <td>${prop.state || "—"}</td>
-      <td>${prop.zip || "—"}</td>
-      <td>${prop.case_status || "—"}</td>
-      <td>${prop.case_id || "—"}</td>
-    `;
+    row.append(
+      createCell(prop.address || "—"),
+      createCell(prop.city || "—"),
+      createCell(prop.state || "—"),
+      createCell(prop.zip || "—"),
+      createCell(prop.case_status || "—"),
+      createCell(prop.case_id || "—")
+    );
     tbody.appendChild(row);
   });
 };
 
 const renderTopDeals = (deals) => {
   const tbody = document.querySelector("#top-deals-table tbody");
-  tbody.innerHTML = "";
+  clearElement(tbody);
   if (!deals.length) {
     document.getElementById("top-deals-empty").textContent =
       "No ranked deals available yet. Import auction data to generate scores.";
@@ -429,22 +463,25 @@ const renderTopDeals = (deals) => {
   document.getElementById("top-deals-empty").textContent = "";
   deals.forEach((deal) => {
     const row = document.createElement("tr");
-    row.innerHTML = `
-      <td>${deal.score ?? "—"}</td>
-      <td>${deal.tier || "—"}</td>
-      <td>${deal.address || "—"}</td>
-      <td>${deal.auction_date ? new Date(deal.auction_date).toLocaleDateString() : "—"}</td>
-      <td>${deal.urgency_days ?? "—"}</td>
-      <td>${deal.exit_strategy || "—"}</td>
-      <td>${deal.case_status || "—"}</td>
-    `;
+    const auctionDate = deal.auction_date
+      ? new Date(deal.auction_date).toLocaleDateString()
+      : "—";
+    row.append(
+      createCell(deal.score ?? "—"),
+      createCell(deal.tier || "—"),
+      createCell(deal.address || "—"),
+      createCell(auctionDate),
+      createCell(deal.urgency_days ?? "—"),
+      createCell(deal.exit_strategy || "—"),
+      createCell(deal.case_status || "—")
+    );
     tbody.appendChild(row);
   });
 };
 
 const renderLeadsTable = (leads) => {
   const tbody = document.querySelector("#leads-table tbody");
-  tbody.innerHTML = "";
+  clearElement(tbody);
   document.getElementById("leads-count").textContent = leads.length;
   if (!leads.length) {
     document.getElementById("leads-empty").textContent =
@@ -454,20 +491,20 @@ const renderLeadsTable = (leads) => {
   document.getElementById("leads-empty").textContent = "";
   leads.forEach((lead) => {
     const row = document.createElement("tr");
-    row.innerHTML = `
-      <td>${lead.lead_id || lead.id || "—"}</td>
-      <td>${lead.address || "—"}</td>
-      <td>${lead.city || "—"}</td>
-      <td>${lead.status || "—"}</td>
-      <td>${lead.score ?? "—"}</td>
-    `;
+    row.append(
+      createCell(lead.lead_id || lead.id || "—"),
+      createCell(lead.address || "—"),
+      createCell(lead.city || "—"),
+      createCell(lead.status || "—"),
+      createCell(lead.score ?? "—")
+    );
     tbody.appendChild(row);
   });
 };
 
 const renderReportsTable = (reports) => {
   const tbody = document.querySelector("#reports-table tbody");
-  tbody.innerHTML = "";
+  clearElement(tbody);
   document.getElementById("reports-count").textContent = reports.length;
   if (!reports.length) {
     document.getElementById("reports-empty").textContent =
@@ -477,20 +514,20 @@ const renderReportsTable = (reports) => {
   document.getElementById("reports-empty").textContent = "";
   reports.forEach((report) => {
     const row = document.createElement("tr");
-    row.innerHTML = `
-      <td>${report.bot || "—"}</td>
-      <td>${report.level || "—"}</td>
-      <td>${report.code || "—"}</td>
-      <td>${report.message || "—"}</td>
-      <td>${formatTimestamp(report.created_at)}</td>
-    `;
+    row.append(
+      createCell(report.bot || "—"),
+      createCell(report.level || "—"),
+      createCell(report.code || "—"),
+      createCell(report.message || "—"),
+      createCell(formatTimestamp(report.created_at))
+    );
     tbody.appendChild(row);
   });
 };
 
 const renderCommandsTable = (commands) => {
   const tbody = document.querySelector("#commands-table tbody");
-  tbody.innerHTML = "";
+  clearElement(tbody);
   document.getElementById("commands-count").textContent = commands.length;
   if (!commands.length) {
     document.getElementById("commands-empty").textContent =
@@ -500,20 +537,20 @@ const renderCommandsTable = (commands) => {
   document.getElementById("commands-empty").textContent = "";
   commands.forEach((command) => {
     const row = document.createElement("tr");
-    row.innerHTML = `
-      <td>${command.target_bot || "—"}</td>
-      <td>${command.command || "—"}</td>
-      <td>${command.status || "pending"}</td>
-      <td>${command.priority ?? "—"}</td>
-      <td>${formatTimestamp(command.created_at)}</td>
-    `;
+    row.append(
+      createCell(command.target_bot || "—"),
+      createCell(command.command || "—"),
+      createCell(command.status || "pending"),
+      createCell(command.priority ?? "—"),
+      createCell(formatTimestamp(command.created_at))
+    );
     tbody.appendChild(row);
   });
 };
 
 const renderSettingsTable = (settings) => {
   const tbody = document.querySelector("#settings-table tbody");
-  tbody.innerHTML = "";
+  clearElement(tbody);
   document.getElementById("settings-count").textContent = settings.length;
   if (!settings.length) {
     document.getElementById("settings-empty").textContent =
@@ -523,11 +560,11 @@ const renderSettingsTable = (settings) => {
   document.getElementById("settings-empty").textContent = "";
   settings.forEach((setting) => {
     const row = document.createElement("tr");
-    row.innerHTML = `
-      <td>${setting.key || "—"}</td>
-      <td>${setting.value || "—"}</td>
-      <td>${formatTimestamp(setting.updated_at)}</td>
-    `;
+    row.append(
+      createCell(setting.key || "—"),
+      createCell(setting.value || "—"),
+      createCell(formatTimestamp(setting.updated_at))
+    );
     tbody.appendChild(row);
   });
 };
@@ -546,9 +583,15 @@ const renderMapPins = (map, properties) => {
   }
   properties.forEach((prop) => {
     if (prop.latitude && prop.longitude) {
+      const popup = document.createElement("div");
+      const address = document.createElement("div");
+      address.textContent = prop.address || "—";
+      const status = document.createElement("div");
+      status.textContent = `Status: ${prop.case_status || "—"}`;
+      popup.append(address, status);
       L.marker([prop.latitude, prop.longitude])
         .addTo(map)
-        .bindPopup(`${prop.address}<br />Status: ${prop.case_status || "—"}`);
+        .bindPopup(popup);
     }
   });
 };
@@ -568,12 +611,13 @@ const loadPropertyDetail = async (propertyId, mapInstance) => {
   }
   const detail = await fetchJson(`${getApiBase()}/properties/${propertyId}`);
   const container = document.getElementById("property-detail");
-  container.innerHTML = `
-    <div class="panel"><strong>Address:</strong> ${detail.address || "—"}</div>
-    <div class="panel"><strong>Status:</strong> ${detail.case_status || "—"}</div>
-    <div class="panel"><strong>Case:</strong> ${detail.case_id || "—"}</div>
-    <div class="panel"><strong>Loan Type:</strong> ${detail.loan_type || "—"}</div>
-  `;
+  clearElement(container);
+  container.append(
+    createPanel("Address", detail.address || "—"),
+    createPanel("Status", detail.case_status || "—"),
+    createPanel("Case", detail.case_id || "—"),
+    createPanel("Loan Type", detail.loan_type || "—")
+  );
   if (mapInstance && detail.latitude && detail.longitude) {
     mapInstance.setView([detail.latitude, detail.longitude], 14);
     L.marker([detail.latitude, detail.longitude]).addTo(mapInstance);
@@ -995,7 +1039,7 @@ const init = async () => {
   updatePropertyDetailState();
 
   const referralList = document.getElementById("referral-status-list");
-  referralList.innerHTML = "";
+  clearElement(referralList);
   if (state.enums.referralStatus.length) {
     state.enums.referralStatus.forEach((status) => {
       const li = document.createElement("li");
