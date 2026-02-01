@@ -665,4 +665,4 @@ const wireEvents = () => {
   loadAuctionImports();
 };
 
-init();
+initapp();
