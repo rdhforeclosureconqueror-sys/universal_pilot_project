@@ -2,12 +2,13 @@ from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
 from sqlalchemy.orm import Session
 import shutil
 import os
+from uuid import UUID
 
 from db.session import get_db
-from models.auction_imports import AuctionImport
 from ingestion.dallas.dallas_pdf_ingestion import ingest_pdf
 
 router = APIRouter(prefix="/auction-imports", tags=["Auction Imports"])
+
 
 @router.post("/upload")
 async def upload_pdf(file: UploadFile = File(...), db: Session = Depends(get_db)):
@@ -15,17 +16,22 @@ async def upload_pdf(file: UploadFile = File(...), db: Session = Depends(get_db)
         raise HTTPException(status_code=400, detail="Only PDF files are supported.")
 
     contents = await file.read()
+
+    # ✅ Local import to avoid circular import error
+    from models.auction_imports import AuctionImport
+
     import_record = AuctionImport(
         filename=file.filename,
         content_type=file.content_type,
         file_bytes=contents,
         status="received",
     )
+
     db.add(import_record)
     db.commit()
     db.refresh(import_record)
 
-    # Save file temporarily to disk for pdfplumber
+    # ✅ Temporarily save the uploaded PDF for ingestion
     tmp_path = f"/tmp/{file.filename}"
     with open(tmp_path, "wb") as f:
         f.write(contents)
