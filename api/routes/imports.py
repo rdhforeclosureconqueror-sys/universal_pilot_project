@@ -18,7 +18,7 @@ from db.session import get_db
 from models.properties import Property
 from models.cases import Case
 from models.ai_scores import AIScore
-from models.auction_imports import AuctionImport
+from models.auction_import_model import AuctionImport
 from models.deal_scores import DealScore
 from models.enums import CaseStatus
 from audit.logger import log_audit
