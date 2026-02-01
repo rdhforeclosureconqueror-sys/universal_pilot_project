@@ -664,5 +664,53 @@ const wireEvents = () => {
   updateFormValidation();
   loadAuctionImports();
 };
+const renderLeadScoreChart = (leads = []) => {
+  const chartEl = document.querySelector("#lead-score-chart");
+  if (!chartEl || !leads.length) return;
 
+  // Group by score range
+  const buckets = {
+    "Hot (80-100)": 0,
+    "Warm (50-79)": 0,
+    "Cold (<50)": 0,
+  };
+
+  leads.forEach((lead) => {
+    const score = lead.score ?? 0;
+    if (score >= 80) buckets["Hot (80-100)"]++;
+    else if (score >= 50) buckets["Warm (50-79)"]++;
+    else buckets["Cold (<50)"]++;
+  });
+
+  const options = {
+    chart: {
+      type: "donut",
+      height: 350,
+    },
+    labels: Object.keys(buckets),
+    series: Object.values(buckets),
+    colors: ["#FF4560", "#FEB019", "#00E396"],
+    title: {
+      text: "Lead Score Distribution",
+      style: { fontSize: "20px", color: "#fff" },
+    },
+    legend: {
+      position: "bottom",
+      labels: { colors: "#fff" },
+    },
+    tooltip: {
+      y: {
+        formatter: (val) => `${val} leads`,
+      },
+    },
+    theme: {
+      mode: "dark", // Matches your visual style
+    },
+  };
+
+  const chart = new ApexCharts(chartEl, options);
+  chart.render();
+};
+
+renderRealCharts();
 initapp();
