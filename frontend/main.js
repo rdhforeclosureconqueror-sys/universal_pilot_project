@@ -1001,7 +1001,7 @@ const wireEvents = () => {
   });
 };
 
-const init = async () => {
+const initapp = async () => {
   const page = window.location.hash.replace("#/", "");
   setPage(page || "dashboard");
   renderCharts();
@@ -1090,7 +1090,7 @@ const init = async () => {
   setPage(page || "dashboard");
 };
 
-init().catch((error) => {
+initapp().catch((error) => {
   document.getElementById("metric-cards").textContent =
     "Unable to initialize dashboard. Check API base URL.";
   renderCharts();
