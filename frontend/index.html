@@ -1,17 +1,19 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Universal Pilot CRM</title>
-    <link rel="stylesheet" href="/static/crm.css" />
-    <link
-      rel="stylesheet"
-      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-      crossorigin=""
-    />
-  </head>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Universal Pilot CRM</title>
+  <link rel="stylesheet" href="/static/crm.css" />
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-D4NXAojJBHlN+hmNHzrCF9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
+  <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+</head>
+
   <body class="theme-light">
     <div class="app-shell">
       <aside class="sidebar">
@@ -44,58 +46,64 @@
         </div>
       </aside>
 
-      <main class="content">
-        <header class="topbar">
-          <div>
-            <h2 id="page-title">Operator Dashboard</h2>
-            <p id="page-subtitle">Status-aware overview of your operations.</p>
-          </div>
-          <div class="actions">
-            <button type="button" id="theme-toggle" class="ghost">Toggle Theme</button>
-          </div>
-        </header>
+    <main class="content">
+  <header class="topbar">
+    <div>
+      <h2 id="page-title">Operator Dashboard</h2>
+      <p id="page-subtitle">Status-aware overview of your operations.</p>
+    </div>
+    <div class="actions">
+      <button type="button" id="theme-toggle" class="ghost">Toggle Theme</button>
+    </div>
+  </header>
 
-        <section class="page" data-page="dashboard">
-          <div class="grid two">
-            <div class="card">
-              <h3>Operational Metrics</h3>
-              <div class="metrics" id="metric-cards"></div>
-            </div>
-            <div class="card">
-              <h3>Case Status Summary</h3>
-              <ul id="case-status-summary" class="status-list"></ul>
-            </div>
-          </div>
-          <div class="card full">
-            <h3>Top Deals (Platinum View)</h3>
-            <div class="empty-state" id="top-deals-empty"></div>
-            <table class="data-table" id="top-deals-table">
-              <thead>
-                <tr>
-                  <th>Score</th>
-                  <th>Tier</th>
-                  <th>Address</th>
-                  <th>Auction Date</th>
-                  <th>Urgency (days)</th>
-                  <th>Exit Strategy</th>
-                  <th>Case Status</th>
-                </tr>
-              </thead>
-              <tbody></tbody>
-            </table>
-          </div>
-          <div class="grid two">
-            <div class="card">
-              <h3>Alerts & Blocks</h3>
-              <ul id="blocked-actions" class="status-list"></ul>
-            </div>
-            <div class="card">
-              <h3>Quick Links</h3>
-              <div class="quick-links" id="quick-links"></div>
-            </div>
-          </div>
-          <div class="chart-grid" data-charts="dashboard"></div>
-        </section>
+  <section class="page" data-page="dashboard">
+    <div class="grid two">
+      <div class="card">
+        <h3>Operational Metrics</h3>
+        <div class="metrics" id="metric-cards"></div>
+      </div>
+      <div class="card">
+        <h3>Case Status Summary</h3>
+        <ul id="case-status-summary" class="status-list"></ul>
+      </div>
+    </div>
+
+    <div class="card full">
+      <h3>Top Deals (Platinum View)</h3>
+      <div class="empty-state" id="top-deals-empty"></div>
+      <table class="data-table" id="top-deals-table">
+        <thead>
+          <tr>
+            <th>Score</th>
+            <th>Tier</th>
+            <th>Address</th>
+            <th>Auction Date</th>
+            <th>Urgency (days)</th>
+            <th>Exit Strategy</th>
+            <th>Case Status</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div class="grid two">
+      <div class="card">
+        <h3>Alerts & Blocks</h3>
+        <ul id="blocked-actions" class="status-list"></ul>
+      </div>
+      <div class="card">
+        <h3>Quick Links</h3>
+        <div class="quick-links" id="quick-links"></div>
+      </div>
+    </div>
+
+    <!-- 📊 Charts Area -->
+    <div class="chart-grid" data-charts="dashboard"></div>
+  </section>
+</main>
+
 
         <section class="page" data-page="cases">
           <div class="grid two">
