@@ -1,6 +1,5 @@
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
 from sqlalchemy.orm import Session
-import shutil
 import os
 
 from db.session import get_db
@@ -16,7 +15,7 @@ async def upload_pdf(file: UploadFile = File(...), db: Session = Depends(get_db)
 
     contents = await file.read()
 
-    # Import AuctionImport inside the function to avoid circular import
+    # ✅ Avoid circular import by importing this here:
     from models.auction_imports import AuctionImport
 
     import_record = AuctionImport(
@@ -30,7 +29,7 @@ async def upload_pdf(file: UploadFile = File(...), db: Session = Depends(get_db)
     db.commit()
     db.refresh(import_record)
 
-    # Save file temporarily to disk for pdfplumber
+    # Save temporarily
     tmp_path = f"/tmp/{file.filename}"
     with open(tmp_path, "wb") as f:
         f.write(contents)
