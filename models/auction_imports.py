@@ -2,7 +2,6 @@ from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
 from sqlalchemy.orm import Session
 import shutil
 import os
-from uuid import UUID
 
 from db.session import get_db
 from ingestion.dallas.dallas_pdf_ingestion import ingest_pdf
@@ -17,7 +16,7 @@ async def upload_pdf(file: UploadFile = File(...), db: Session = Depends(get_db)
 
     contents = await file.read()
 
-    # ✅ Local import to avoid circular import error
+    # Import AuctionImport inside the function to avoid circular import
     from models.auction_imports import AuctionImport
 
     import_record = AuctionImport(
@@ -31,7 +30,7 @@ async def upload_pdf(file: UploadFile = File(...), db: Session = Depends(get_db)
     db.commit()
     db.refresh(import_record)
 
-    # ✅ Temporarily save the uploaded PDF for ingestion
+    # Save file temporarily to disk for pdfplumber
     tmp_path = f"/tmp/{file.filename}"
     with open(tmp_path, "wb") as f:
         f.write(contents)
