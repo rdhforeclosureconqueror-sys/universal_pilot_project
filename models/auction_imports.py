@@ -4,6 +4,7 @@ import os
 
 from db.session import get_db
 from ingestion.dallas.dallas_pdf_ingestion import ingest_pdf
+from models.auction_import_model import AuctionImport  # ✅ Clean import from isolated model
 
 router = APIRouter(prefix="/auction-imports", tags=["Auction Imports"])
 
@@ -14,9 +15,6 @@ async def upload_pdf(file: UploadFile = File(...), db: Session = Depends(get_db)
         raise HTTPException(status_code=400, detail="Only PDF files are supported.")
 
     contents = await file.read()
-
-    # ✅ Avoid circular import by importing this here:
-    from models.auction_imports import AuctionImport
 
     import_record = AuctionImport(
         filename=file.filename,
