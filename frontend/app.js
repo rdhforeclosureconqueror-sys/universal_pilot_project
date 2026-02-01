@@ -704,7 +704,7 @@ const renderLeadScoreChart = (leads = []) => {
       },
     },
     theme: {
-      mode: "dark", // Matches your visual style
+      mode: "dark",
     },
   };
 
@@ -712,5 +712,17 @@ const renderLeadScoreChart = (leads = []) => {
   chart.render();
 };
 
-renderRealCharts();
+// Load leads from API and render the chart
+const loadLeadChart = async () => {
+  try {
+    const response = await fetch(`${getApiBase()}/leads`);
+    if (!response.ok) throw new Error("Failed to fetch leads");
+    const leads = await response.json();
+    renderLeadScoreChart(leads);
+  } catch (error) {
+    console.error("Lead score chart error:", error);
+  }
+};
+
+loadLeadChart();
 initapp();
