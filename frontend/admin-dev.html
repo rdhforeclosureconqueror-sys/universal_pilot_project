@@ -180,14 +180,6 @@
       </section>
 
       <section>
-        <h2>Task Checks</h2>
-        <div class="card">
-          <p>Task checks are evaluated server-side. No direct UI actions are exposed.</p>
-          <div class="schema-list" id="taskcheck-schema"></div>
-        </div>
-      </section>
-
-      <section>
         <h2>Referrals</h2>
         <div class="grid">
           <div class="card">
@@ -285,7 +277,11 @@
       </section>
     </main>
 
+    <!-- Config + JS modules -->
     <script src="/config.js"></script>
     <script type="module" src="/static/app.js"></script>
+
+    <!-- ✅ Add Chart.js at the end -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   </body>
 </html>
