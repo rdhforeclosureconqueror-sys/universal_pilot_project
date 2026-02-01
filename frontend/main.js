@@ -1102,7 +1102,7 @@ initapp().catch((error) => {
   document.getElementById("metric-cards").textContent =
     "Unable to initialize dashboard. Check API base URL.";
   renderCharts();
-  const page = window.location.hash.replace("#/", "");
-  setPage(page || "dashboard");
+  setPage(window.location.hash.replace("#/", "") || "dashboard");
   console.error(error);
 });
+
