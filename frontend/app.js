@@ -311,10 +311,11 @@ const handleAuctionImport = async (event) => {
   const formData = new FormData();
   formData.append("file", fileInput.files[0]);
 
-  const response = await fetch(`${getApiBase()}/imports/auction`, {
-    method: "POST",
-    body: formData,
-  });
+ const response = await fetch(`${getApiBase()}/auction-imports/upload`, {
+  method: "POST",
+  body: formData,
+});
+
   const text = await response.text();
   updateResponse("auction-import-response", text);
   loadAuctionImports();
