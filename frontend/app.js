@@ -742,5 +742,8 @@ const loadDealScoreChart = async () => {
     console.error("Deal score chart error:", error);
   }
 };
+document.addEventListener("DOMContentLoaded", () => {
+  loadAuctionImports(); // ✅ This triggers your table loading logic
+});
 
 loadDealScoreChart();
