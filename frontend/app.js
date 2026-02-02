@@ -344,7 +344,9 @@ const loadAuctionImports = async () => {
     const response = await fetch(`${getApiBase()}/imports/auction-files`);
     if (!response.ok) throw new Error("Unable to load auction imports.");
 
+    const imports = await response.json();
     console.log("✅ Auction Imports:", imports);
+    
     if (!imports.length) {
       empty.textContent = "No auction imports uploaded yet.";
       return;
