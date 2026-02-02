@@ -297,28 +297,41 @@ const handleDocumentList = async (event) => {
 
 const handleAuctionImport = async (event) => {
   event.preventDefault();
+
   const form = event.target;
   const fileInput = form.auction_csv;
+
+  // Validate file selection
   if (!fileInput.files.length) {
     updateResponse("auction-import-response", "Select a CSV or PDF file to import.");
     return;
   }
-  const fileName = fileInput.files[0].name.toLowerCase();
+
+  const file = fileInput.files[0];
+  const fileName = file.name.toLowerCase();
+
+  // Validate file extension
   if (!fileName.endsWith(".csv") && !fileName.endsWith(".pdf")) {
     updateResponse("auction-import-response", "CSV or PDF file required.");
     return;
   }
+
   const formData = new FormData();
-  formData.append("file", fileInput.files[0]);
+  formData.append("file", file);
 
- const response = await fetch(`${getApiBase()}/auction-imports/upload`, {
-  method: "POST",
-  body: formData,
-});
+  try {
+    const response = await fetch(`${getApiBase()}/auction-imports/upload`, {
+      method: "POST",
+      body: formData,
+    });
 
-  const text = await response.text();
-  updateResponse("auction-import-response", text);
-  loadAuctionImports();
+    const text = await response.text();
+    updateResponse("auction-import-response", text);
+    loadAuctionImports();
+  } catch (error) {
+    updateResponse("auction-import-response", "Upload failed. Please try again.");
+    console.error("Auction import error:", error);
+  }
 };
 
 const loadAuctionImports = async () => {
@@ -329,32 +342,35 @@ const loadAuctionImports = async () => {
 
   try {
     const response = await fetch(`${getApiBase()}/imports/auction-files`);
-    if (!response.ok) {
-      throw new Error("Unable to load auction imports.");
-    }
+    if (!response.ok) throw new Error("Unable to load auction imports.");
+
     const imports = await response.json();
     if (!imports.length) {
       empty.textContent = "No auction imports uploaded yet.";
       return;
     }
-   imports.forEach((item) => {
-  const row = document.createElement("tr");
 
-  const downloadLink = document.createElement("a");
-  downloadLink.href = new URL(`/imports/auction-files/${item.id}`, getApiBase()).toString();
-  downloadLink.textContent = "Download";
-  downloadLink.target = "_blank";
-  downloadLink.rel = "noopener noreferrer";
+    imports.forEach((item) => {
+      const row = document.createElement("tr");
 
+      const downloadLink = document.createElement("a");
+      downloadLink.href = new URL(`/imports/auction-files/${item.id}`, getApiBase()).toString();
+      downloadLink.textContent = "Download";
+      downloadLink.target = "_blank";
+      downloadLink.rel = "noopener noreferrer";
 
       const filenameCell = document.createElement("td");
       filenameCell.textContent = item.filename || "—";
+
       const statusCell = document.createElement("td");
       statusCell.textContent = item.status || "—";
+
       const recordsCell = document.createElement("td");
       recordsCell.textContent = item.records_created ?? "—";
+
       const uploadedCell = document.createElement("td");
       uploadedCell.textContent = formatTimestamp(item.uploaded_at);
+
       const downloadCell = document.createElement("td");
       downloadCell.appendChild(downloadLink);
 
@@ -363,8 +379,10 @@ const loadAuctionImports = async () => {
     });
   } catch (error) {
     empty.textContent = "Unable to load auction imports.";
+    console.error("Error loading auction imports:", error);
   }
 };
+
 
 const handleConsentGrant = async (event) => {
   event.preventDefault();
