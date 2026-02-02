@@ -665,9 +665,9 @@ const wireEvents = () => {
   updateFormValidation();
   loadAuctionImports();
 };
-const renderLeadScoreChart = (leads = []) => {
+const renderScoreChart = (items = [], label = "Lead") => {
   const chartEl = document.querySelector("#lead-score-chart");
-  if (!chartEl || !leads.length) return;
+  if (!chartEl || !items.length) return;
 
   // Group by score range
   const buckets = {
@@ -676,8 +676,8 @@ const renderLeadScoreChart = (leads = []) => {
     "Cold (<50)": 0,
   };
 
-  leads.forEach((lead) => {
-    const score = lead.score ?? 0;
+  items.forEach((item) => {
+    const score = item.score ?? 0;
     if (score >= 80) buckets["Hot (80-100)"]++;
     else if (score >= 50) buckets["Warm (50-79)"]++;
     else buckets["Cold (<50)"]++;
@@ -692,7 +692,7 @@ const renderLeadScoreChart = (leads = []) => {
     series: Object.values(buckets),
     colors: ["#FF4560", "#FEB019", "#00E396"],
     title: {
-      text: "Lead Score Distribution",
+      text: `${label} Score Distribution`,
       style: { fontSize: "20px", color: "#fff" },
     },
     legend: {
@@ -701,7 +701,7 @@ const renderLeadScoreChart = (leads = []) => {
     },
     tooltip: {
       y: {
-        formatter: (val) => `${val} leads`,
+        formatter: (val) => `${val} ${label.toLowerCase()}s`,
       },
     },
     theme: {
@@ -713,17 +713,16 @@ const renderLeadScoreChart = (leads = []) => {
   chart.render();
 };
 
-// Load leads from API and render the chart
-const loadLeadChart = async () => {
+// Load deals and reuse score chart
+const loadDealScoreChart = async () => {
   try {
-    const response = await fetch(`${getApiBase()}/leads`);
-    if (!response.ok) throw new Error("Failed to fetch leads");
-    const leads = await response.json();
-    renderLeadScoreChart(leads);
+    const response = await fetch(`${getApiBase()}/deals/top`);
+    if (!response.ok) throw new Error("Failed to fetch deals");
+    const deals = await response.json();
+    renderScoreChart(deals, "Deal");
   } catch (error) {
-    console.error("Lead score chart error:", error);
+    console.error("Deal score chart error:", error);
   }
 };
 
-loadLeadChart();
-initapp();
+loadDealScoreChart();
