@@ -1,5 +1,6 @@
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
 from sqlalchemy.orm import Session
+from datetime import datetime
 import os
 
 from db.session import get_db
@@ -21,6 +22,7 @@ async def upload_pdf(file: UploadFile = File(...), db: Session = Depends(get_db)
         content_type=file.content_type,
         file_bytes=contents,
         status="received",
+        uploaded_at=datetime.utcnow(),  # ✅ Ensure timestamp is set
     )
 
     db.add(import_record)
