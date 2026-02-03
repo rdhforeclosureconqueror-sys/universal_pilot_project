@@ -60,6 +60,5 @@ app.include_router(deals.router)
 app.include_router(documents.router)
 app.include_router(referral.router)
 app.include_router(training.router)
-app.include_router(imports.router)
 app.include_router(properties.router)
 app.include_router(auction_imports.router)  # ✅ Needed for /auction-imports/*
