@@ -7,6 +7,8 @@ from db.session import get_db
 from ingestion.dallas.dallas_pdf_ingestion import ingest_pdf
 from models.auction_import_model import AuctionImport  # ✅ Clean import from isolated model
 
+from fastapi.encoders import jsonable_encoder
+
 router = APIRouter(prefix="/auction-imports", tags=["Auction Imports"])
 
 
@@ -54,3 +56,19 @@ async def upload_pdf(file: UploadFile = File(...), db: Session = Depends(get_db)
         "records_created": import_record.records_created,
         "error": import_record.error_message,
     }
+
+
+# ✅ Route used by frontend (duplicate to support expected path)
+@router.get("/auction-files", name="get_auction_imports")
+@router.get("/imports/auction-files", include_in_schema=False)
+async def get_auction_imports(db: Session = Depends(get_db)):
+    records = db.query(AuctionImport).order_by(AuctionImport.uploaded_at.desc()).all()
+    return jsonable_encoder([
+        {
+            "id": str(r.id),
+            "filename": r.filename,
+            "status": r.status,
+            "records_created": r.records_created,
+            "uploaded_at": r.uploaded_at.isoformat() if r.uploaded_at else None
+        } for r in records
+    ])
