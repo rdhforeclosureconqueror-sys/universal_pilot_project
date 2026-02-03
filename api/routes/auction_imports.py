@@ -104,8 +104,7 @@ async def upload_auction_file(file: UploadFile = File(...), db: Session = Depend
             f.write(contents)
         try:
             created = ingest_pdf(tmp_path, db)
-            print("Uploaded file (PDF):", file.filename)
-            print("Records created from PDF:", created)
+            print(f"✅ PDF Ingest complete: {file.filename}, Records created: {created}")
 
             auction_import.status = "processed"
             auction_import.records_created = created
@@ -143,8 +142,7 @@ async def upload_auction_file(file: UploadFile = File(...), db: Session = Depend
         auction_import.records_created = created
         db.commit()
 
-        print("Uploaded file (CSV):", file.filename)
-        print("Records created from CSV:", created)
+        print(f"✅ CSV Ingest complete: {file.filename}, Records created: {created}")
 
         return {
             "id": str(auction_import.id),
