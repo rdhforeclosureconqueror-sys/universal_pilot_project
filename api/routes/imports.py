@@ -2,6 +2,7 @@ import csv
 import json
 import logging
 import os
+import pdfplumber
 from datetime import datetime, timezone
 from tempfile import NamedTemporaryFile
 from urllib.parse import urlencode
@@ -17,7 +18,7 @@ from db.session import get_db
 from models.properties import Property
 from models.cases import Case
 from models.ai_scores import AIScore
-from models.auction_imports import AuctionImport
+from models.auction_import_model import AuctionImport
 from models.deal_scores import DealScore
 from models.enums import CaseStatus
 from audit.logger import log_audit
@@ -112,10 +113,10 @@ def _deal_score(equity, urgency_days) -> tuple[int, str, str, int | None]:
     return score, tier, exit_strategy, urgency_days
 
 
-def _load_csv_reader(file: UploadFile, file_bytes: bytes):
+def _load_csv_reader(file: UploadFile):
     if not file.filename.lower().endswith(".csv"):
         raise HTTPException(status_code=400, detail="CSV file required")
-    decoded = file_bytes.decode("utf-8").splitlines()
+    decoded = file.file.read().decode("utf-8").splitlines()
     return csv.DictReader(decoded)
 
 
@@ -123,22 +124,22 @@ def _load_csv_reader(file: UploadFile, file_bytes: bytes):
 @router.post("/auction-csv")
 def import_auction_csv(
     file: UploadFile = File(...),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     try:
-        file_bytes = file.file.read()
-        auction_import = AuctionImport(
-            filename=file.filename,
-            content_type=file.content_type,
-            file_bytes=file_bytes,
-            status="received",
-            uploaded_at=datetime.now(timezone.utc),
-        )
-        db.add(auction_import)
-        db.commit()
-        db.refresh(auction_import)
-
         if file.filename.lower().endswith(".pdf"):
+            file_bytes = file.file.read()
+            auction_import = AuctionImport(
+                filename=file.filename,
+                content_type=file.content_type,
+                file_bytes=file_bytes,
+                file_type="pdf",
+                status="received",
+            )
+            db.add(auction_import)
+            db.commit()
+            db.refresh(auction_import)
+
             with NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
                 temp_file.write(file_bytes)
                 temp_path = temp_file.name
@@ -150,24 +151,38 @@ def import_auction_csv(
                 logger.info("Committed Dallas PDF ingestion (%s records)", created)
             except Exception as exc:
                 db.rollback()
-                failed = db.query(AuctionImport).filter(
-                    AuctionImport.id == auction_import.id
-                ).first()
+                failed = (
+                    db.query(AuctionImport)
+                    .filter(AuctionImport.id == auction_import.id)
+                    .first()
+                )
                 if failed:
                     failed.status = "failed"
                     failed.error_message = str(exc)
                     db.commit()
-                raise
             finally:
                 os.unlink(temp_path)
+
             return {
                 "status": "success",
                 "message": "PDF ingestion completed",
                 "records_created": created,
-                "import_id": str(auction_import.id),
             }
 
-        reader = _load_csv_reader(file, file_bytes)
+        # CSV handling logic would go below if you support it
+
+    except Exception as exc:
+        raise HTTPException(
+    status_code=500,
+    detail={
+        "error": str(exc),
+        "import_id": str(auction_import.id),
+    }
+)
+
+            
+
+        reader = _load_csv_reader(file)
         required_headers = {
             "external_id",
             "address",
@@ -286,25 +301,11 @@ def import_auction_csv(
 
             created += 1
 
-        auction_import.status = "processed"
-        auction_import.records_created = created
         db.commit()
-        return {
-            "status": "success",
-            "records_created": created,
-            "import_id": str(auction_import.id),
-        }
+        return {"status": "success", "records_created": created}
     except HTTPException:
         raise
     except Exception as exc:
-        db.rollback()
-        failed = db.query(AuctionImport).filter(
-            AuctionImport.filename == file.filename
-        ).order_by(AuctionImport.uploaded_at.desc()).first()
-        if failed and failed.status != "failed":
-            failed.status = "failed"
-            failed.error_message = str(exc)
-            db.commit()
         logger.exception("Auction CSV import failed")
         raise HTTPException(status_code=500, detail=str(exc))
 

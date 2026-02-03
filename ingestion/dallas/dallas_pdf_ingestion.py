@@ -1,5 +1,4 @@
 import logging
-
 import pdfplumber
 from sqlalchemy.orm import Session
 
@@ -11,6 +10,16 @@ from .log_error import log_error
 logger = logging.getLogger(__name__)
 
 def ingest_pdf(pdf_path: str, db: Session) -> int:
+    """
+    Ingests a Dallas County PDF and writes valid rows to the database.
+
+    Args:
+        pdf_path (str): Path to the PDF file.
+        db (Session): SQLAlchemy DB session.
+
+    Returns:
+        int: Number of records successfully created.
+    """
     created = 0
     with pdfplumber.open(pdf_path) as pdf:
         for page in pdf.pages:
@@ -25,13 +34,13 @@ def ingest_pdf(pdf_path: str, db: Session) -> int:
                             continue
                         normalized = normalize(record)
                         logger.info(
-                            "Persisting Dallas PDF row %s / %s",
+                            "Persisting Dallas PDF row: Case %s | Address %s",
                             normalized.get("case_number"),
                             normalized.get("address"),
                         )
-                        with db.begin_nested():
+                        with db.begin_nested():  # Safe transaction block
                             write_to_db(normalized, db)
                         created += 1
                     except Exception as exc:
-                        log_error(row, exc)
+                        log_error(row, exc)  # Log individual row error but continue
     return created

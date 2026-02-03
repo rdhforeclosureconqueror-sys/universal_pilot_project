@@ -297,27 +297,41 @@ const handleDocumentList = async (event) => {
 
 const handleAuctionImport = async (event) => {
   event.preventDefault();
+
   const form = event.target;
   const fileInput = form.auction_csv;
+
+  // Validate file selection
   if (!fileInput.files.length) {
     updateResponse("auction-import-response", "Select a CSV or PDF file to import.");
     return;
   }
-  const fileName = fileInput.files[0].name.toLowerCase();
+
+  const file = fileInput.files[0];
+  const fileName = file.name.toLowerCase();
+
+  // Validate file extension
   if (!fileName.endsWith(".csv") && !fileName.endsWith(".pdf")) {
     updateResponse("auction-import-response", "CSV or PDF file required.");
     return;
   }
-  const formData = new FormData();
-  formData.append("file", fileInput.files[0]);
 
-  const response = await fetch(`${getApiBase()}/imports/auction`, {
-    method: "POST",
-    body: formData,
-  });
-  const text = await response.text();
-  updateResponse("auction-import-response", text);
-  loadAuctionImports();
+  const formData = new FormData();
+  formData.append("file", file);
+
+  try {
+    const response = await fetch(`${getApiBase()}/auction-imports/upload`, {
+      method: "POST",
+      body: formData,
+    });
+
+    const text = await response.text();
+    updateResponse("auction-import-response", text);
+    loadAuctionImports();
+  } catch (error) {
+    updateResponse("auction-import-response", "Upload failed. Please try again.");
+    console.error("Auction import error:", error);
+  }
 };
 
 const loadAuctionImports = async () => {
@@ -328,30 +342,37 @@ const loadAuctionImports = async () => {
 
   try {
     const response = await fetch(`${getApiBase()}/imports/auction-files`);
-    if (!response.ok) {
-      throw new Error("Unable to load auction imports.");
-    }
+    if (!response.ok) throw new Error("Unable to load auction imports.");
+
     const imports = await response.json();
+    console.log("✅ Auction Imports:", imports);
+    
     if (!imports.length) {
       empty.textContent = "No auction imports uploaded yet.";
       return;
     }
+
     imports.forEach((item) => {
       const row = document.createElement("tr");
+
       const downloadLink = document.createElement("a");
-      downloadLink.href = `${getApiBase()}/imports/auction-files/${item.id}`;
+      downloadLink.href = new URL(`/imports/auction-files/${item.id}`, getApiBase()).toString();
       downloadLink.textContent = "Download";
       downloadLink.target = "_blank";
       downloadLink.rel = "noopener noreferrer";
 
       const filenameCell = document.createElement("td");
       filenameCell.textContent = item.filename || "—";
+
       const statusCell = document.createElement("td");
       statusCell.textContent = item.status || "—";
+
       const recordsCell = document.createElement("td");
       recordsCell.textContent = item.records_created ?? "—";
+
       const uploadedCell = document.createElement("td");
       uploadedCell.textContent = formatTimestamp(item.uploaded_at);
+
       const downloadCell = document.createElement("td");
       downloadCell.appendChild(downloadLink);
 
@@ -360,8 +381,10 @@ const loadAuctionImports = async () => {
     });
   } catch (error) {
     empty.textContent = "Unable to load auction imports.";
+    console.error("Error loading auction imports:", error);
   }
 };
+
 
 const handleConsentGrant = async (event) => {
   event.preventDefault();
@@ -627,10 +650,12 @@ const wireEvents = () => {
   });
 };
 
-const init = async () => {
-  if (!apiBaseInput.value && window.__API_BASE_URL__) {
-    apiBaseInput.value = window.__API_BASE_URL__;
+    const initapp = async () => {
+     if (!apiBaseInput.value && window.__API_BASE_URL__) {
+       apiBaseInput.value = window.__API_BASE_URL__;
   }
+
+  
   try {
     const openApi = await fetchOpenApi();
     const schemas = openApi.components?.schemas;
@@ -660,5 +685,67 @@ const init = async () => {
   updateFormValidation();
   loadAuctionImports();
 };
+const renderScoreChart = (items = [], label = "Lead") => {
+  const chartEl = document.querySelector("#lead-score-chart");
+  if (!chartEl || !items.length) return;
 
-init();
+  // Group by score range
+  const buckets = {
+    "Hot (80-100)": 0,
+    "Warm (50-79)": 0,
+    "Cold (<50)": 0,
+  };
+
+  items.forEach((item) => {
+    const score = item.score ?? 0;
+    if (score >= 80) buckets["Hot (80-100)"]++;
+    else if (score >= 50) buckets["Warm (50-79)"]++;
+    else buckets["Cold (<50)"]++;
+  });
+
+  const options = {
+    chart: {
+      type: "donut",
+      height: 350,
+    },
+    labels: Object.keys(buckets),
+    series: Object.values(buckets),
+    colors: ["#FF4560", "#FEB019", "#00E396"],
+    title: {
+      text: `${label} Score Distribution`,
+      style: { fontSize: "20px", color: "#fff" },
+    },
+    legend: {
+      position: "bottom",
+      labels: { colors: "#fff" },
+    },
+    tooltip: {
+      y: {
+        formatter: (val) => `${val} ${label.toLowerCase()}s`,
+      },
+    },
+    theme: {
+      mode: "dark",
+    },
+  };
+
+  const chart = new ApexCharts(chartEl, options);
+  chart.render();
+};
+
+// Load deals and reuse score chart
+const loadDealScoreChart = async () => {
+  try {
+    const response = await fetch(`${getApiBase()}/deals/top`);
+    if (!response.ok) throw new Error("Failed to fetch deals");
+    const deals = await response.json();
+    renderScoreChart(deals, "Deal");
+  } catch (error) {
+    console.error("Deal score chart error:", error);
+  }
+};
+document.addEventListener("DOMContentLoaded", () => {
+  loadAuctionImports(); // ✅ This triggers your table loading logic
+});
+
+loadDealScoreChart();

@@ -827,6 +827,7 @@ const updateValidation = () => {
   const metaValid = validateJson(docForm.meta.value);
   const evidenceType = docForm.evidence_type.value.trim();
   let evidenceValid = docType !== "other";
+
   if (docType === "other") {
     if (docForm.meta.value.trim()) {
       try {
@@ -839,6 +840,7 @@ const updateValidation = () => {
       evidenceValid = evidenceType.length > 0;
     }
   }
+
   docButton.disabled =
     !validateUuid(docForm.case_id.value) ||
     !hasFile ||
@@ -860,6 +862,7 @@ const updateValidation = () => {
     consentRecord &&
     !consentRecord.revoked &&
     consentRecord.scope.includes("referral");
+
   referralButton.disabled = !(
     hasReferralConsent &&
     validateUuid(referralForm.case_id.value) &&
@@ -885,12 +888,16 @@ const updateValidation = () => {
     .split(",")
     .map((item) => item.trim())
     .filter((item) => item.length > 0);
+
   document.getElementById("case-consent-grant-submit").disabled =
     !validateUuid(caseDetailId) || consentScope.length === 0;
 
-  const consentRecord = state.consentState.get(caseDetailId);
+  const existingConsentRecord = state.consentState.get(caseDetailId);
   document.getElementById("case-consent-revoke-submit").disabled =
-    !validateUuid(caseDetailId) || !consentRecord || consentRecord.revoked;
+    !validateUuid(caseDetailId) ||
+    !existingConsentRecord ||
+    existingConsentRecord.revoked;
+
   document.getElementById("document-upload-empty").textContent =
     "Upload evidence to attach to a case.";
   document.getElementById("document-view-empty").textContent =
@@ -908,6 +915,7 @@ const updateValidation = () => {
   document.getElementById("ai-log-empty").textContent =
     "AI activity logs populate after AI workflows execute.";
 };
+
 
 const wireEvents = () => {
   document
@@ -1001,7 +1009,7 @@ const wireEvents = () => {
   });
 };
 
-const init = async () => {
+const initapp = async () => {
   const page = window.location.hash.replace("#/", "");
   setPage(page || "dashboard");
   renderCharts();
@@ -1085,14 +1093,16 @@ const init = async () => {
   } catch (error) {
     document.getElementById("leads-empty").textContent =
       "Unable to load BotOps tables. Check API connectivity.";
-  }
+     }
+   const currentPage = window.location.hash.replace("#/", "");
+  setPage(currentPage || "dashboard");
 };
 
-init().catch((error) => {
+initapp().catch((error) => {
   document.getElementById("metric-cards").textContent =
     "Unable to initialize dashboard. Check API base URL.";
   renderCharts();
-  const page = window.location.hash.replace("#/", "");
-  setPage(page || "dashboard");
+  setPage(window.location.hash.replace("#/", "") || "dashboard");
   console.error(error);
 });
+

@@ -123,7 +123,7 @@
                 <span>CSV or PDF File (.csv, .pdf)</span>
                 <input type="file" name="auction_csv" accept=".csv,.pdf" required />
               </label>
-              <button type="submit" id="auction-import-submit" disabled>Import Auction File</button>
+              <button type="submit" id="auction-import-submit">Import Auction File</button>
             </form>
             <pre class="response" id="auction-import-response"></pre>
           </div>
@@ -285,7 +285,11 @@
       </section>
     </main>
 
+    <!-- Config + JS modules -->
     <script src="/config.js"></script>
     <script type="module" src="/static/app.js"></script>
+
+    <!-- ✅ Add Chart.js at the end -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   </body>
 </html>
