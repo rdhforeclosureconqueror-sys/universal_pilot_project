@@ -21,7 +21,13 @@ class DallasPublicRecord:
     zip: str
     source: str
     status: str
-    raw: dict
+    county: str = "Dallas"
+    trustee: str = ""
+    mortgagor: str = ""
+    mortgagee: str = ""
+    auction_date: Optional[str] = None
+    case_number: str = ""
+    raw: dict = None
 
 
 def _fetch_text(url: str) -> str:
