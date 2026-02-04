@@ -23,5 +23,4 @@ from .botops import (
     BotTrigger,
     BotInboundLog,
     BotPage,
-    Lead,
 )
