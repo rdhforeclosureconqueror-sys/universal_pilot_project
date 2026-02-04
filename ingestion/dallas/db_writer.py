@@ -15,72 +15,97 @@ logger = logging.getLogger(__name__)
 def _get_or_create_property(session: Session, record: dict) -> Property:
     existing = (
         session.query(Property)
-        .filter(Property.external_id == record["external_id"])
+        .filter(Property.external_id == record.get("external_id"))
         .first()
     )
     if existing:
         return existing
 
     prop = Property(
-        external_id=record["external_id"],
-        address=record["address"],
-        city=record["city"],
-        state=record["state"],
-        zip=record["zip"],
-        county=record.get("county"),
-        mortgagor=record.get("mortgagor"),
-        mortgagee=record.get("mortgagee"),
-        trustee=record.get("trustee"),
+        external_id=record.get("external_id") or str(uuid4()),
+        address=record.get("address", "").strip(),
+        city=record.get("city", "Dallas").strip(),
+        state=record.get("state", "TX").strip(),
+        zip=record.get("zip", "").strip(),
+        county=record.get("county", "Dallas").strip(),
+        mortgagor=record.get("mortgagor", "").strip(),
+        mortgagee=record.get("mortgagee", "").strip(),
+        trustee=record.get("trustee", "").strip(),
         auction_date=record.get("auction_date"),
-        source=record.get("source"),
+        source=record.get("source", "unknown").strip(),
     )
+
     session.add(prop)
     session.flush()
     return prop
 
 
 def write_to_db(record: dict, session: Session) -> None:
-    prop = _get_or_create_property(session, record)
-    case = Case(
-        id=uuid4(),
-        status=CaseStatus[record["status"]],
-        created_by=uuid4(),
-        program_type="FORECLOSURE_PREVENTION",
-        property_id=prop.id,
-    )
-    session.add(case)
-    session.flush()
-    urgency_days = None
-    if prop.auction_date:
-        urgency_days = (prop.auction_date.replace(tzinfo=timezone.utc) - datetime.now(timezone.utc)).days
-    score = 50
-    if urgency_days is not None:
-        if urgency_days <= 7:
-            score += 20
-        elif urgency_days <= 30:
-            score += 10
-        elif urgency_days <= 90:
-            score += 5
-    score = max(0, min(100, score))
-    if score >= 80:
-        tier = "A"
-    elif score >= 60:
-        tier = "B"
-    else:
-        tier = "C"
-    exit_strategy = "AUCTION_RUSH" if urgency_days is not None and urgency_days <= 7 else "NEGOTIATE"
-    deal_score = DealScore(
-        id=uuid4(),
-        property_id=prop.id,
-        case_id=case.id,
-        score=score,
-        tier=tier,
-        exit_strategy=exit_strategy,
-        urgency_days=urgency_days,
-    )
-    session.add(deal_score)
-    logger.info(
-        "Inserted case for property %s (%s)",
-        prop.id,
-        record.get("case_number"),
-    )
+    try:
+        prop = _get_or_create_property(session, record)
+
+        case = Case(
+            id=uuid4(),
+            status=CaseStatus.get(record.get("status", "PRE_FORECLOSURE")),
+            created_by=uuid4(),
+            program_type="FORECLOSURE_PREVENTION",
+            property_id=prop.id,
+        )
+
+        session.add(case)
+        session.flush()
+
+        urgency_days = None
+        if prop.auction_date:
+            try:
+                urgency_days = (
+                    prop.auction_date.replace(tzinfo=timezone.utc) - datetime.now(timezone.utc)
+                ).days
+            except Exception as e:
+                logger.warning(f"Invalid auction_date format: {e}")
+
+        score = 50
+        if urgency_days is not None:
+            if urgency_days <= 7:
+                score += 20
+            elif urgency_days <= 30:
+                score += 10
+            elif urgency_days <= 90:
+                score += 5
+
+        score = max(0, min(100, score))
+
+        if score >= 80:
+            tier = "A"
+        elif score >= 60:
+            tier = "B"
+        else:
+            tier = "C"
+
+        exit_strategy = (
+            "AUCTION_RUSH"
+            if urgency_days is not None and urgency_days <= 7
+            else "NEGOTIATE"
+        )
+
+        deal_score = DealScore(
+            id=uuid4(),
+            property_id=prop.id,
+            case_id=case.id,
+            score=score,
+            tier=tier,
+            exit_strategy=exit_strategy,
+            urgency_days=urgency_days,
+        )
+
+        session.add(deal_score)
+
+        logger.info(
+            "✅ Inserted case for property %s (case_number=%s)",
+            prop.id,
+            record.get("case_number"),
+        )
+
+    except Exception as e:
+        logger.error("❌ Failed to write record to DB: %s", e)
+        raise
