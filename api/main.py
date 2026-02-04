@@ -18,11 +18,12 @@ from api.routes import (
     referral,
     training,
     properties,
-    auction_imports,  # ✅ Newly added auction import route
+    auction_imports,
+    leads,     # ✅ Newly added auction import route
 )
 
 app = FastAPI()
-
+app.include_router(leads.router)
 # ✅ Mount static frontend directory (relative to this file)
 frontend_dir = Path(__file__).resolve().parent.parent / "frontend"
 app.mount("/static", StaticFiles(directory=frontend_dir), name="static")
