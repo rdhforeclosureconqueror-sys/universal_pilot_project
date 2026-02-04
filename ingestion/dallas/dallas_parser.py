@@ -5,6 +5,9 @@ from .utils import clean_address, normalize_case_number, parse_date, clean_zip
 
 EXPECTED_COLUMNS = 9
 HEADER_TOKENS = {
+    "id",
+    "lead_id",
+    "source",
     "address",
     "city",
     "state",
