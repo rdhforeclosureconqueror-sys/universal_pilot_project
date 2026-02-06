@@ -5,12 +5,15 @@ from ai.diamond_ai_model_adapter import AIModelAdapter
 from ai.logger import log_ai_activity
 from ai.utils.ai_gate import check_ai_consent, is_ai_disabled
 from db.session import get_db
+from auth.authorization import PolicyAuthorizer
 from auth.dependencies import get_current_user
 from audit.logger import log_audit
 from policy.loader import PolicyEngine
+from models.cases import Case
 import hashlib
 
 router = APIRouter(prefix="/ai", tags=["Diamond AI"])
+
 
 class AIRequest(BaseModel):
     case_id: str
@@ -18,26 +21,25 @@ class AIRequest(BaseModel):
     role: str  # assistive, advisory, automated
     policy_rule_id: str
 
+
 @router.post("/dryrun")
 def ai_dryrun(request: AIRequest, db: Session = Depends(get_db), user=Depends(get_current_user)):
-    case = db.query(models.Case).filter_by(id=request.case_id).first()
+    PolicyAuthorizer(db).require_case_action(user=user, case_id=request.case_id, action="ai.dryrun")
+
+    case = db.query(Case).filter_by(id=request.case_id).first()
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
 
-    # Check consent
     check_ai_consent(case.id, db)
 
-    # Check policy-bound kill switch
     policy = PolicyEngine(db).get_policy_by_id(case.policy_version_id)
     if is_ai_disabled(policy, request.role):
         raise HTTPException(status_code=403, detail="AI disabled by policy")
 
-    # Run model
     adapter = AIModelAdapter("local", "stubbed", "v1")
     result = adapter.run_inference(request.prompt, context={"system_message": "You are an assistant."})
     prompt_hash = hashlib.sha256(request.prompt.encode()).hexdigest()
 
-    # Log AI activity
     log_ai_activity(
         db=db,
         case_id=case.id,
