@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from models.documents import Document, DocumentType
 from models.audit_logs import AuditLog
 from db.session import get_db
+from auth.authorization import PolicyAuthorizer
 from auth.dependencies import get_current_user
 from uuid import uuid4
 from datetime import datetime
@@ -10,21 +11,22 @@ import json
 
 router = APIRouter(prefix="/documents", tags=["Documents"])
 
+
 @router.post("/", status_code=201)
 def upload_document(
     case_id: str = Form(...),
     doc_type: DocumentType = Form(...),
-    meta: str = Form("{}"),  # Default to empty JSON string
+    meta: str = Form("{}"),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     user=Depends(get_current_user)
 ):
+    PolicyAuthorizer(db).require_case_action(user=user, case_id=case_id, action="documents.upload")
     try:
         meta_json = json.loads(meta)
     except json.JSONDecodeError:
         raise HTTPException(status_code=400, detail="Invalid JSON in 'meta'")
 
-    # Enforce 'evidence_type' if doc_type is 'other'
     if doc_type == DocumentType.other:
         if "evidence_type" not in meta_json:
             raise HTTPException(
@@ -40,7 +42,7 @@ def upload_document(
         doc_type=doc_type,
         meta=meta_json,
         uploaded_by=user.id,
-        file_url=f"s3://your-bucket/{file.filename}"  # Replace with actual S3 logic
+        file_url=f"s3://your-bucket/{file.filename}"
     )
     db.add(doc)
 
@@ -65,6 +67,7 @@ def get_document(doc_id: str, db: Session = Depends(get_db), user=Depends(get_cu
     doc = db.query(Document).filter(Document.id == doc_id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
+    PolicyAuthorizer(db).require_case_action(user=user, case_id=str(doc.case_id), action="documents.read")
     return {
         "doc_id": doc.id,
         "case_id": doc.case_id,
@@ -76,5 +79,6 @@ def get_document(doc_id: str, db: Session = Depends(get_db), user=Depends(get_cu
 
 @router.get("/case/{case_id}")
 def list_case_documents(case_id: str, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    PolicyAuthorizer(db).require_case_action(user=user, case_id=case_id, action="documents.list")
     docs = db.query(Document).filter(Document.case_id == case_id).all()
     return [{"id": d.id, "doc_type": d.doc_type, "meta": d.meta} for d in docs]
