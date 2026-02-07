@@ -25,7 +25,7 @@ def submit_quiz_attempt(request: QuizSubmission, db: Session = Depends(get_db), 
     PolicyAuthorizer(db).require_case_action(user=user, case_id=request.case_id, action="training.quiz_attempt")
 
     case = db.query(Case).filter_by(id=request.case_id).first()
-    if not case or case.case_type != "training_enrollment":
+    if not case or (case.case_type != "training_enrollment" and case.program_type != "training_enrollment"):
         raise HTTPException(status_code=400, detail="Not a training case")
 
     policy = PolicyEngine(db).get_policy_by_id(case.policy_version_id).config_json

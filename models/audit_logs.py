@@ -13,7 +13,7 @@ class AuditLog(Base):
     actor_is_ai = Column(Boolean, default=False)
     action_type = Column(String, nullable=False)
     reason_code = Column(String, nullable=False)
-    before_json = Column(JSON, nullable=True)   # ✅ no "state"
-    after_json = Column(JSON, nullable=True)    # ✅ no "state"
+    before_state = Column(JSON, nullable=True)
+    after_state = Column(JSON, nullable=True)
     policy_version_id = Column(UUID(as_uuid=True), ForeignKey("policy_versions.id"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
