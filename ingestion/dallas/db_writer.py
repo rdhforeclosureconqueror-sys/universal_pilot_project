@@ -103,11 +103,20 @@ def write_to_db(record: dict, session: Session) -> None:
     try:
         prop = _get_or_create_property(session, record)
 
+        canonical_fields = {
+            "external_id", "address", "city", "state", "zip", "county", "trustee",
+            "mortgagor", "mortgagee", "auction_date", "source", "status", "opening_bid",
+            "case_number", "assessed_value", "est_balance"
+        }
+        extra_fields = {k: v for k, v in record.items() if k not in canonical_fields}
+
         case = Case(
             id=uuid4(),
             status=CaseStatus.get(record.get("status", "PRE_FORECLOSURE")),
             created_by=uuid4(),
             program_type="FORECLOSURE_PREVENTION",
+            program_key="FORECLOSURE_PREVENTION",
+            meta={"extra_fields": extra_fields} if extra_fields else {},
             property_id=prop.id,
         )
 
