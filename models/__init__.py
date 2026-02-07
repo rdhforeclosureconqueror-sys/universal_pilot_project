@@ -24,3 +24,5 @@ from .botops import (
     BotInboundLog,
     BotPage,
 )
+
+from .role_sessions import RoleSession
