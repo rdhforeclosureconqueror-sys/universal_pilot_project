@@ -59,7 +59,7 @@ class PolicyAuthorizer:
             .filter(RoleSession.revoked_at.is_(None))
             .filter(RoleSession.expires_at > datetime.utcnow())
             .filter((RoleSession.scope_case_id.is_(None)) | (RoleSession.scope_case_id == case.id))
-            .filter((RoleSession.scope_program_key.is_(None)) | (RoleSession.scope_program_key == case.program_key) | (RoleSession.scope_program_key == case.program_type))
+            .filter((RoleSession.scope_program_key.is_(None)) | (RoleSession.scope_program_key == case.program_type))
             .order_by(RoleSession.expires_at.desc())
             .first()
         )
