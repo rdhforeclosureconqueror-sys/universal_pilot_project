@@ -5,8 +5,7 @@ Revises: b2e1f0a9c002
 Create Date: 2026-02-07
 """
 
-from alembic import op
-import sqlalchemy as sa
+# Consolidated into baseline (8bfa64f896dc) to guarantee clean rebuilds.
 
 # revision identifiers, used by Alembic.
 revision = "c6489d4d49af"
@@ -16,11 +15,8 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column(
-        "auction_imports",
-        sa.Column("file_type", sa.String(), nullable=True)
-    )
+    pass
 
 
 def downgrade() -> None:
-    op.drop_column("auction_imports", "file_type")
+    pass
