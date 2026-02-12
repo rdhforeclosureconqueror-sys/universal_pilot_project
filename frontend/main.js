@@ -959,7 +959,7 @@ const wireEvents = () => {
     }
     const formData = new FormData();
     formData.append("file", fileInput.files[0]);
-    fetch(`${getApiBase()}/auction-imports/imports`, {
+    fetch(`${getApiBase()}/auction-imports/upload`, {
       method: "POST",
       body: formData,
     })
