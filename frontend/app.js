@@ -320,7 +320,7 @@ const handleAuctionImport = async (event) => {
   formData.append("file", file);
 
   try {
-    const response = await fetch(`${getApiBase()}/auction-import/import`, {
+    const response = await fetch(`${getApiBase()}/auction-imports/import`, {
       method: "POST",
       body: formData,
     });
