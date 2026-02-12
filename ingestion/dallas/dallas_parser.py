@@ -10,7 +10,7 @@ def parse_dallas_row(row: List[str]) -> Optional[dict]:
     Returns:
         Optional[dict]: A dictionary with normalized auction data or None if invalid.
     """
-    cells = _normalize_row(row)
+    cells = (row)
     if not cells:
         return None
 
