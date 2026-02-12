@@ -356,7 +356,7 @@ const loadAuctionImports = async () => {
       const row = document.createElement("tr");
 
       const downloadLink = document.createElement("a");
-      downloadLink.href = new URL(`/imports/auction-files/${item.id}`, getApiBase()).toString();
+      downloadLink.href = new URL(`/auction-imports/auction-files/${item.id}`, getApiBase()).toString();
       downloadLink.textContent = "Download";
       downloadLink.target = "_blank";
       downloadLink.rel = "noopener noreferrer";
