@@ -745,7 +745,6 @@ const loadDealScoreChart = async () => {
   }
 };
 document.addEventListener("DOMContentLoaded", () => {
-  loadAuctionImports(); // ✅ This triggers your table loading logic
+  initapp();
+  loadDealScoreChart();
 });
-
-loadDealScoreChart();
