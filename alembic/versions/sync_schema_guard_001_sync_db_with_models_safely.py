@@ -1,7 +1,7 @@
 """Sync DB schema with models safely
 
 Revision ID: sync_schema_guard_001
-Revises: 6f4b2c1b2a8d   # <-- PUT YOUR CURRENT HEAD REVISION HERE
+Revises: c6489d4d49af  
 Create Date: 2026-02-16
 """
 
