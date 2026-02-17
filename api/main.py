@@ -20,6 +20,7 @@ from api.routes import (
     properties,
     auction_imports,
     leads,     # ✅ Newly added auction import route
+    workflow,
 )
 
 app = FastAPI()
@@ -63,3 +64,4 @@ app.include_router(referral.router)
 app.include_router(training.router)
 app.include_router(properties.router)
 app.include_router(auction_imports.router)  # ✅ Needed for /auction-imports/*
+app.include_router(workflow.router)

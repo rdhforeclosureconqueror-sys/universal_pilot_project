@@ -9,6 +9,7 @@ import os
 import csv
 import json
 import logging
+import hashlib
 from tempfile import NamedTemporaryFile
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
@@ -84,12 +85,29 @@ def _load_csv_reader(file):
 @router.post("/upload")
 async def upload_auction_file(file: UploadFile = File(...), db: Session = Depends(get_db)):
     contents = await file.read()
+    file_hash = hashlib.sha256(contents).hexdigest()
+
+    existing = (
+        db.query(AuctionImport)
+        .filter(AuctionImport.file_hash == file_hash)
+        .order_by(AuctionImport.uploaded_at.desc())
+        .first()
+    )
+    if existing:
+        return {
+            "id": str(existing.id),
+            "status": existing.status,
+            "records_created": existing.records_created,
+            "error": existing.error_message,
+            "replay": True,
+        }
 
     auction_import = AuctionImport(
         filename=file.filename,
         content_type=file.content_type,
         file_bytes=contents,
         file_type="pdf" if file.filename.endswith(".pdf") else "csv",
+        file_hash=file_hash,
         status="received",
         uploaded_at=datetime.utcnow(),
     )

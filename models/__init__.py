@@ -23,5 +23,14 @@ from .botops import (
     BotTrigger,
     BotInboundLog,
     BotPage,
-    Lead,
+)
+
+from .workflow import (
+    WorkflowTemplate,
+    WorkflowStep,
+    CaseWorkflowInstance,
+    CaseWorkflowProgress,
+    WorkflowResponsibleRole,
+    WorkflowStepStatus,
+    WorkflowOverride,
 )
