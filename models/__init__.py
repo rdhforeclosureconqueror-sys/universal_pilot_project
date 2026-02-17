@@ -33,3 +33,5 @@ from .workflow import (
     WorkflowResponsibleRole,
     WorkflowStepStatus,
 )
+
+from .role_sessions import RoleSession

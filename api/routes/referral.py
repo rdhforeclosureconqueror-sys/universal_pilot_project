@@ -5,6 +5,7 @@ from models.consent_records import ConsentRecord
 from models.outbox_queue import OutboxQueue
 from models.audit_logs import AuditLog
 from db.session import get_db
+from auth.authorization import PolicyAuthorizer
 from auth.dependencies import get_current_user
 from uuid import uuid4
 from datetime import datetime
@@ -12,12 +13,15 @@ from pydantic import BaseModel
 
 router = APIRouter(prefix="/cases/{case_id}/referral", tags=["Referrals"])
 
+
 class ReferralRequest(BaseModel):
     partner_id: str
 
+
 @router.post("/", status_code=202)
 def queue_referral(case_id: str, request: ReferralRequest, db: Session = Depends(get_db), user=Depends(get_current_user)):
-    # Step 1: Enforce consent gating
+    PolicyAuthorizer(db).require_case_action(user=user, case_id=case_id, action="referral.queue")
+
     consent = db.query(ConsentRecord).filter(
         ConsentRecord.case_id == case_id,
         ConsentRecord.revoked == False,
@@ -25,7 +29,6 @@ def queue_referral(case_id: str, request: ReferralRequest, db: Session = Depends
     ).first()
 
     if not consent:
-        # Audit blocked attempt
         audit = AuditLog(
             id=uuid4(),
             case_id=case_id,
@@ -40,7 +43,6 @@ def queue_referral(case_id: str, request: ReferralRequest, db: Session = Depends
         db.commit()
         raise HTTPException(status_code=403, detail="Consent for referral not found")
 
-    # Step 2: Create Referral in `draft` status
     referral_id = uuid4()
     referral = Referral(
         id=referral_id,
@@ -51,7 +53,6 @@ def queue_referral(case_id: str, request: ReferralRequest, db: Session = Depends
     )
     db.add(referral)
 
-    # Step 3: Queue Outbox Job
     dedupe_key = f"referral:{case_id}:{request.partner_id}"
     existing = db.query(OutboxQueue).filter_by(dedupe_key=dedupe_key).first()
     if existing:
@@ -69,7 +70,6 @@ def queue_referral(case_id: str, request: ReferralRequest, db: Session = Depends
     )
     db.add(outbox)
 
-    # Step 4: Audit success
     audit = AuditLog(
         id=uuid4(),
         case_id=case_id,
