@@ -12,8 +12,8 @@ from models.botops import (
     BotTrigger,
     BotInboundLog,
     BotPage,
-    Lead,
 )
+from models.leads import Lead
 from schemas.botops import (
     BotSettingUpsert,
     BotReportCreate,

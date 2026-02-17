@@ -86,7 +86,13 @@ class LeadUpsert(BaseModel):
     state: Optional[str] = None
     zip: Optional[str] = None
     apn: Optional[str] = None
-    sale_date: Optional[datetime] = None
+    county: Optional[str] = None
+    trustee: Optional[str] = None
+    mortgagor: Optional[str] = None
+    mortgagee: Optional[str] = None
+    auction_date: Optional[datetime] = None
+    case_number: Optional[str] = None
+    opening_bid: Optional[float] = None
     list_price: Optional[float] = None
     arrears: Optional[float] = None
     equity_pct: Optional[float] = None

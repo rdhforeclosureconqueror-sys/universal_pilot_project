@@ -8,6 +8,9 @@ from models.cases import Case
 from models.enums import CaseStatus
 from models.properties import Property
 from models.deal_scores import DealScore
+from models.leads import Lead
+from models.audit_logs import AuditLog
+from services.workflow_engine import initialize_case_workflow, sync_case_workflow
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +41,64 @@ def _get_or_create_property(session: Session, record: dict) -> Property:
     session.add(prop)
     session.flush()
     return prop
+
+
+def _parse_opening_bid(value) -> float | None:
+    if value in (None, ""):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    cleaned = str(value).replace("$", "").replace(",", "").strip()
+    if not cleaned:
+        return None
+    try:
+        return float(cleaned)
+    except ValueError:
+        return None
+
+
+def _get_or_create_lead(
+    session: Session,
+    record: dict,
+    score: float,
+    tier: str,
+    exit_strategy: str,
+) -> Lead:
+    lead_id = (
+        record.get("external_id")
+        or record.get("case_number")
+        or f"lead-{uuid4().hex[:12]}"
+    )
+    lead = session.query(Lead).filter(Lead.lead_id == lead_id).first()
+    lead_data = {
+        "lead_id": lead_id,
+        "source": record.get("source"),
+        "address": record.get("address", "").strip(),
+        "city": record.get("city", "Dallas").strip(),
+        "state": record.get("state", "TX").strip(),
+        "zip": record.get("zip", "").strip(),
+        "county": record.get("county", "Dallas").strip(),
+        "trustee": record.get("trustee", "").strip(),
+        "mortgagor": record.get("mortgagor", "").strip(),
+        "mortgagee": record.get("mortgagee", "").strip(),
+        "auction_date": record.get("auction_date"),
+        "case_number": record.get("case_number"),
+        "opening_bid": _parse_opening_bid(record.get("opening_bid")),
+        "status": record.get("status"),
+        "score": score,
+        "tier": tier,
+        "exit_strategy": exit_strategy,
+    }
+
+    if lead:
+        for key, value in lead_data.items():
+            setattr(lead, key, value)
+    else:
+        lead = Lead(**lead_data)
+        session.add(lead)
+
+    session.flush()
+    return lead
 
 
 def write_to_db(record: dict, session: Session) -> None:
@@ -99,6 +160,49 @@ def write_to_db(record: dict, session: Session) -> None:
         )
 
         session.add(deal_score)
+        lead = _get_or_create_lead(
+            session=session,
+            record=record,
+            score=score,
+            tier=tier,
+            exit_strategy=exit_strategy,
+        )
+
+        session.add_all([
+            AuditLog(
+                id=uuid4(),
+                case_id=case.id,
+                actor_id=None,
+                actor_is_ai=True,
+                action_type="auction_import_created",
+                reason_code="system_ingest",
+                before_json=None,
+                after_json={"source": record.get("source")},
+            ),
+            AuditLog(
+                id=uuid4(),
+                case_id=case.id,
+                actor_id=None,
+                actor_is_ai=True,
+                action_type="lead_created",
+                reason_code="system_ingest",
+                before_json=None,
+                after_json={"lead_id": lead.lead_id},
+            ),
+            AuditLog(
+                id=uuid4(),
+                case_id=case.id,
+                actor_id=None,
+                actor_is_ai=True,
+                action_type="case_created",
+                reason_code="system_ingest",
+                before_json=None,
+                after_json={"status": case.status.value if hasattr(case.status, "value") else str(case.status)},
+            ),
+        ])
+
+        initialize_case_workflow(session, case.id)
+        sync_case_workflow(session, case.id)
 
         logger.info(
             "✅ Inserted case for property %s (case_number=%s)",
