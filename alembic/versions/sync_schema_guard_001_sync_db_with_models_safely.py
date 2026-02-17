@@ -12,7 +12,7 @@ from sqlalchemy import inspect
 # IMPORTANT:
 # Replace this with whatever `alembic heads` shows
 revision = "sync_schema_guard_001"
-down_revision = "6f4b2c1b2a8d"  # <-- CHANGE THIS
+down_revision = "c6489d4d49af" 
 branch_labels = None
 depends_on = None
 
