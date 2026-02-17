@@ -15,6 +15,7 @@ class AuctionImport(Base):
     content_type = Column(String, nullable=True)
     file_bytes = Column(LargeBinary, nullable=False)
     file_type = Column(String, nullable=True)
+    file_hash = Column(String, nullable=True, unique=True, index=True)
     status = Column(String, nullable=False, default="received")
     records_created = Column(Integer, nullable=False, default=0)
     error_message = Column(String, nullable=True)

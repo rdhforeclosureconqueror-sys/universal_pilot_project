@@ -69,3 +69,16 @@ class CaseWorkflowProgress(Base):
     started_at = Column(DateTime(timezone=True), nullable=True)
     completed_at = Column(DateTime(timezone=True), nullable=True)
     block_reason = Column(String, nullable=True)
+
+
+class WorkflowOverride(Base):
+    __tablename__ = "workflow_overrides"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    case_id = Column(UUID(as_uuid=True), ForeignKey("cases.id"), nullable=False, index=True)
+    instance_id = Column(UUID(as_uuid=True), ForeignKey("case_workflow_instances.id"), nullable=False, index=True)
+    from_step_key = Column(String, nullable=False)
+    to_step_key = Column(String, nullable=False)
+    reason = Column(String, nullable=False)
+    actor_id = Column(UUID(as_uuid=True), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

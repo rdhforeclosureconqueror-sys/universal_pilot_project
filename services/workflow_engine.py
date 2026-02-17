@@ -424,3 +424,132 @@ def get_foreclosure_kanban(db: Session) -> dict[str, Any]:
 
     columns.sort(key=lambda c: c["name"])
     return {"columns": columns}
+
+
+
+def apply_workflow_override(db: Session, case_id, to_step_key: str, actor_id, reason: str):
+    from models.workflow import WorkflowOverride
+
+    instance = (
+        db.query(CaseWorkflowInstance)
+        .filter(CaseWorkflowInstance.case_id == case_id)
+        .first()
+    )
+    if not instance:
+        return None
+
+    steps = _ordered_steps(db, instance.template_id)
+    step_map = {s.step_key: s for s in steps}
+    if to_step_key not in step_map:
+        return None
+
+    progress_rows = (
+        db.query(CaseWorkflowProgress)
+        .filter(CaseWorkflowProgress.instance_id == instance.id)
+        .all()
+    )
+    progress_map = {p.step_key: p for p in progress_rows}
+
+    from_step = instance.current_step_key
+    target_order = step_map[to_step_key].order_index
+
+    now = datetime.now(timezone.utc)
+    for step in steps:
+        p = progress_map[step.step_key]
+        if step.order_index < target_order:
+            p.status = WorkflowStepStatus.complete
+            p.completed_at = p.completed_at or now
+            p.block_reason = None
+            p.started_at = p.started_at or now
+        elif step.order_index == target_order:
+            p.status = WorkflowStepStatus.active
+            p.started_at = p.started_at or now
+            p.block_reason = None
+            p.completed_at = None
+        else:
+            p.status = WorkflowStepStatus.pending
+            p.started_at = None
+            p.completed_at = None
+            p.block_reason = None
+
+    instance.current_step_key = to_step_key
+    db.add(
+        WorkflowOverride(
+            case_id=case_id,
+            instance_id=instance.id,
+            from_step_key=from_step,
+            to_step_key=to_step_key,
+            reason=reason,
+            actor_id=actor_id,
+        )
+    )
+    db.add(
+        AuditLog(
+            case_id=case_id,
+            actor_id=actor_id,
+            actor_is_ai=False,
+            action_type="workflow_override",
+            reason_code="manual_override",
+            before_json={"from_step": from_step},
+            after_json={"to_step": to_step_key, "reason": reason},
+        )
+    )
+    db.flush()
+    return instance
+
+
+def get_workflow_analytics(db: Session, sla_days: int = 30) -> dict[str, Any]:
+    ensure_default_template(db)
+
+    instances = db.query(CaseWorkflowInstance).all()
+    now = datetime.now(timezone.utc)
+
+    stage_durations: dict[str, list[int]] = {}
+    blocked_cases = 0
+    block_reason_frequency: dict[str, int] = {}
+    sla_breach_count = 0
+    compliance_delay_count = 0
+    case_stage_duration: dict[str, int] = {}
+
+    for instance in instances:
+        progresses = (
+            db.query(CaseWorkflowProgress)
+            .filter(CaseWorkflowProgress.instance_id == instance.id)
+            .all()
+        )
+        for p in progresses:
+            if not p.started_at:
+                continue
+            end = p.completed_at or now
+            duration = max(0, (end - p.started_at).days)
+            stage_durations.setdefault(p.step_key, []).append(duration)
+
+            if p.status == WorkflowStepStatus.active and p.step_key == instance.current_step_key:
+                case_stage_duration[str(instance.case_id)] = duration
+                if duration > sla_days:
+                    sla_breach_count += 1
+
+            if p.status == WorkflowStepStatus.blocked:
+                blocked_cases += 1
+                reason = p.block_reason or "unknown"
+                block_reason_frequency[reason] = block_reason_frequency.get(reason, 0) + 1
+                if reason == "compliance_overdue":
+                    compliance_delay_count += 1
+
+    avg_days_per_stage = {
+        step: (sum(vals) / len(vals) if vals else 0)
+        for step, vals in stage_durations.items()
+    }
+
+    return {
+        "case_stage_duration_days": case_stage_duration,
+        "portfolio": {
+            "case_count": len(instances),
+            "avg_days_per_stage": avg_days_per_stage,
+            "blocked_case_count": blocked_cases,
+            "block_reason_frequency": block_reason_frequency,
+            "sla_breach_count": sla_breach_count,
+            "compliance_delay_count": compliance_delay_count,
+            "sla_days": sla_days,
+        },
+    }
