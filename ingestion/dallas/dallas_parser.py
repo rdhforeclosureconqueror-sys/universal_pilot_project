@@ -1,75 +1,34 @@
+from __future__ import annotations
+
 from typing import List, Optional
-from datetime import datetime
-import re
 
-# Import your existing utilities if they exist
-try:
-    from .utils import clean_address, clean_zip, normalize_case_number
-except ImportError:
-    # Safe fallbacks if utils not available
-    def clean_address(value: str) -> str:
-        return value.strip() if value else ""
-
-    def clean_zip(value: str) -> str:
-        return re.sub(r"[^\d]", "", value)[:5] if value else ""
-
-    def normalize_case_number(value: str) -> str:
-        return value.strip() if value else ""
+from .utils import clean_address, clean_zip, normalize_case_number, parse_date
 
 
-# ------------------------------
-# Safe helper functions
-# ------------------------------
+def _normalize_row(row: List[str]) -> list[str]:
+    return [str(cell or "").strip() for cell in row if str(cell or "").strip()]
 
-def _get_cell(cells: List[str], index: int) -> str:
-    """Safely return a cell value by index."""
-    try:
-        value = cells[index]
-        return value.strip() if value else ""
-    except (IndexError, TypeError):
+
+def _get_cell(cells: list[str], index: int) -> str:
+    if index < 0 or index >= len(cells):
         return ""
+    return cells[index] or ""
 
 
-def _is_header_row(cells: List[str]) -> bool:
-    """Detect header rows."""
-    joined = " ".join(cells).lower()
-    return "address" in joined and "zip" in joined
+def _is_header_row(cells: list[str]) -> bool:
+    token = " ".join(cells).lower()
+    return "address" in token and "zip" in token
 
 
-def _is_noise_row(cells: List[str]) -> bool:
-    """Detect noise rows like page numbers."""
-    joined = " ".join(cells).lower()
-    return (
-        "page" in joined
-        or "dallas county" in joined
-        or "trustee" in joined
-    )
+def _is_noise_row(cells: list[str]) -> bool:
+    token = " ".join(cells).lower()
+    noise_markers = ["cause no", "page", "dallas county", "trustee sale"]
+    return any(marker in token for marker in noise_markers)
 
 
-def _parse_date(value: str) -> Optional[datetime]:
-    """Try multiple date formats safely."""
-    if not value:
-        return None
-
-    formats = [
-        "%m/%d/%Y",
-        "%m/%d/%y",
-        "%Y-%m-%d",
-    ]
-
-    for fmt in formats:
-        try:
-            return datetime.strptime(value.strip(), fmt)
-        except ValueError:
-            continue
-
-    return None
-
-
-def _find_date(cells: List[str]) -> Optional[datetime]:
-    """Scan entire row for something that looks like a date."""
+def _find_date(cells: list[str]):
     for cell in cells:
-        parsed = _parse_date(cell)
+        parsed = parse_date(cell)
         if parsed:
             return parsed
     return None
@@ -105,7 +64,7 @@ def parse_dallas_row(row: List[str]) -> Optional[dict]:
     mortgagee = _get_cell(cells, 7)
     auction_date = _parse_date(_get_cell(cells, 8))
     case_number = normalize_case_number(_get_cell(cells, 9))
-    opening_bid = _get_cell(cells, 10) if len(cells) > 10 else None
+    opening_bid = _get_cell(cells, 10).strip() if len(cells) > 10 else None
 
     # Fallback: search entire row for date
     if not auction_date:

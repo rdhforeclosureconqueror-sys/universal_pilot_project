@@ -10,6 +10,8 @@ from models.enums import CaseStatus
 from models.properties import Property
 from models.deal_scores import DealScore
 from models.leads import Lead
+from models.audit_logs import AuditLog
+from services.workflow_engine import initialize_case_workflow, sync_case_workflow
 
 logger = logging.getLogger(__name__)
 
@@ -139,28 +141,26 @@ def _get_or_create_lead(
         or record.get("case_number")
         or f"lead-{uuid4().hex[:12]}"
     )
-
     lead = session.query(Lead).filter(Lead.lead_id == lead_id).first()
-
-    lead_data = dict(
-        lead_id=lead_id,
-        source=record.get("source"),
-        address=(record.get("address") or "").strip(),
-        city=(record.get("city") or "Dallas").strip(),
-        state=(record.get("state") or "TX").strip(),
-        zip=(record.get("zip") or "").strip(),
-        county=(record.get("county") or "Dallas").strip(),
-        trustee=(record.get("trustee") or "").strip(),
-        mortgagor=(record.get("mortgagor") or "").strip(),
-        mortgagee=(record.get("mortgagee") or "").strip(),
-        auction_date=record.get("auction_date"),
-        case_number=record.get("case_number"),
-        opening_bid=_parse_opening_bid(record.get("opening_bid")),
-        status=record.get("status"),
-        score=score,
-        tier=tier,
-        exit_strategy=exit_strategy,
-    )
+    lead_data = {
+        "lead_id": lead_id,
+        "source": record.get("source"),
+        "address": record.get("address", "").strip(),
+        "city": record.get("city", "Dallas").strip(),
+        "state": record.get("state", "TX").strip(),
+        "zip": record.get("zip", "").strip(),
+        "county": record.get("county", "Dallas").strip(),
+        "trustee": record.get("trustee", "").strip(),
+        "mortgagor": record.get("mortgagor", "").strip(),
+        "mortgagee": record.get("mortgagee", "").strip(),
+        "auction_date": record.get("auction_date"),
+        "case_number": record.get("case_number"),
+        "opening_bid": _parse_opening_bid(record.get("opening_bid")),
+        "status": record.get("status"),
+        "score": score,
+        "tier": tier,
+        "exit_strategy": exit_strategy,
+    }
 
     if lead:
         for key, value in lead_data.items():
@@ -234,6 +234,49 @@ def write_to_db(record: dict, session: Session) -> None:
         )
 
         session.add(deal_score)
+        lead = _get_or_create_lead(
+            session=session,
+            record=record,
+            score=score,
+            tier=tier,
+            exit_strategy=exit_strategy,
+        )
+
+        session.add_all([
+            AuditLog(
+                id=uuid4(),
+                case_id=case.id,
+                actor_id=None,
+                actor_is_ai=True,
+                action_type="auction_import_created",
+                reason_code="system_ingest",
+                before_json=None,
+                after_json={"source": record.get("source")},
+            ),
+            AuditLog(
+                id=uuid4(),
+                case_id=case.id,
+                actor_id=None,
+                actor_is_ai=True,
+                action_type="lead_created",
+                reason_code="system_ingest",
+                before_json=None,
+                after_json={"lead_id": lead.lead_id},
+            ),
+            AuditLog(
+                id=uuid4(),
+                case_id=case.id,
+                actor_id=None,
+                actor_is_ai=True,
+                action_type="case_created",
+                reason_code="system_ingest",
+                before_json=None,
+                after_json={"status": case.status.value if hasattr(case.status, "value") else str(case.status)},
+            ),
+        ])
+
+        initialize_case_workflow(session, case.id)
+        sync_case_workflow(session, case.id)
 
         _get_or_create_lead(
             session=session,

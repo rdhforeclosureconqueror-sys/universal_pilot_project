@@ -25,4 +25,13 @@ from .botops import (
     BotPage,
 )
 
+from .workflow import (
+    WorkflowTemplate,
+    WorkflowStep,
+    CaseWorkflowInstance,
+    CaseWorkflowProgress,
+    WorkflowResponsibleRole,
+    WorkflowStepStatus,
+)
+
 from .role_sessions import RoleSession
