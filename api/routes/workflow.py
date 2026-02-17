@@ -9,9 +9,9 @@ from models.cases import Case
 from models.users import UserRole
 from services.workflow_engine import (
     apply_workflow_override,
+    get_workflow_analytics,
     get_case_workflow_summary,
     get_foreclosure_kanban,
-    get_workflow_analytics,
     initialize_case_workflow,
     sync_case_workflow,
 )

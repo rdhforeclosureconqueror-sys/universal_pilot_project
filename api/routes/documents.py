@@ -4,8 +4,10 @@ import json
 
 from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException
 from sqlalchemy.orm import Session
-
-from audit.logger import log_audit
+from models.documents import Document, DocumentType
+from models.audit_logs import AuditLog
+from db.session import get_db
+from auth.authorization import PolicyAuthorizer
 from auth.dependencies import get_current_user
 from db.session import get_db
 from models.documents import Document
@@ -23,6 +25,7 @@ def upload_document(
     db: Session = Depends(get_db),
     user=Depends(get_current_user),
 ):
+    PolicyAuthorizer(db).require_case_action(user=user, case_id=case_id, action="documents.upload")
     try:
         meta_json = json.loads(meta)
     except json.JSONDecodeError as exc:
@@ -68,6 +71,7 @@ def get_document(doc_id: UUID, db: Session = Depends(get_db), user=Depends(get_c
     doc = db.query(Document).filter(Document.id == doc_id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
+    PolicyAuthorizer(db).require_case_action(user=user, case_id=str(doc.case_id), action="documents.read")
     return {
         "doc_id": str(doc.id),
         "case_id": str(doc.case_id),
@@ -77,7 +81,8 @@ def get_document(doc_id: UUID, db: Session = Depends(get_db), user=Depends(get_c
 
 
 @router.get("/case/{case_id}")
-def list_case_documents(case_id: UUID, db: Session = Depends(get_db), user=Depends(get_current_user)):
+def list_case_documents(case_id: str, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    PolicyAuthorizer(db).require_case_action(user=user, case_id=case_id, action="documents.list")
     docs = db.query(Document).filter(Document.case_id == case_id).all()
     return [
         {

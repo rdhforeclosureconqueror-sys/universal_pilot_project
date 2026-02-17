@@ -333,6 +333,67 @@
     ],
     "optional_job_matching": {
       "enabled": false
+    },
+    "role_eligibility": {
+      "case_worker": [
+        "case_worker"
+      ],
+      "referral_coordinator": [
+        "referral_coordinator"
+      ],
+      "audit_steward": [
+        "audit_steward"
+      ],
+      "ai_policy_chair": [
+        "ai_policy_chair"
+      ],
+      "admin": [
+        "admin",
+        "audit_steward",
+        "referral_coordinator",
+        "case_worker",
+        "ai_policy_chair"
+      ]
+    },
+    "permissions": {
+      "actions": {
+        "documents.upload": [
+          "case_worker",
+          "admin"
+        ],
+        "documents.read": [
+          "case_worker",
+          "audit_steward",
+          "admin"
+        ],
+        "documents.list": [
+          "case_worker",
+          "audit_steward",
+          "admin"
+        ],
+        "consent.grant": [
+          "case_worker",
+          "audit_steward",
+          "admin"
+        ],
+        "consent.revoke": [
+          "case_worker",
+          "audit_steward",
+          "admin"
+        ],
+        "referral.queue": [
+          "referral_coordinator",
+          "admin"
+        ],
+        "training.quiz_attempt": [
+          "case_worker",
+          "admin"
+        ],
+        "ai.dryrun": [
+          "ai_policy_chair",
+          "admin"
+        ]
+      }
     }
   }
 }

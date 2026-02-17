@@ -1,15 +1,15 @@
-"""add deal scores table
+"""add file_type to auction_imports
 
-Revision ID: 6a1b2d9c4e5f
-Revises: 5c7c1b0c2a7d
-Create Date: 2026-01-30 00:00:00.000000
+Revision ID: c6489d4d49af
+Revises: b2e1f0a9c002
+Create Date: 2026-02-07
 """
 
 # Consolidated into baseline (8bfa64f896dc) to guarantee clean rebuilds.
 
 # revision identifiers, used by Alembic.
-revision = "6a1b2d9c4e5f"
-down_revision = "5c7c1b0c2a7d"
+revision = "c6489d4d49af"
+down_revision = "b2e1f0a9c002"
 branch_labels = None
 depends_on = None
 

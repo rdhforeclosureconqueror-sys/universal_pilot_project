@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from models.consent_records import ConsentRecord
 from models.audit_logs import AuditLog
 from db.session import get_db
+from auth.authorization import PolicyAuthorizer
 from auth.dependencies import get_current_user
 from uuid import uuid4
 from datetime import datetime
@@ -11,15 +12,19 @@ from typing import List
 
 router = APIRouter(prefix="/consent", tags=["Consent"])
 
+
 class ConsentGrantRequest(BaseModel):
     case_id: str
-    scope: List[str]  # e.g., ["referral", "document_share"]
+    scope: List[str]
+
 
 class ConsentRevokeRequest(BaseModel):
     case_id: str
 
+
 @router.post("/", status_code=201)
 def grant_consent(request: ConsentGrantRequest, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    PolicyAuthorizer(db).require_case_action(user=user, case_id=request.case_id, action="consent.grant")
     existing = db.query(ConsentRecord).filter(
         ConsentRecord.case_id == request.case_id,
         ConsentRecord.revoked == False
@@ -52,8 +57,10 @@ def grant_consent(request: ConsentGrantRequest, db: Session = Depends(get_db), u
     db.commit()
     return {"status": "consent_granted", "scope": request.scope}
 
+
 @router.post("/revoke", status_code=200)
 def revoke_consent(request: ConsentRevokeRequest, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    PolicyAuthorizer(db).require_case_action(user=user, case_id=request.case_id, action="consent.revoke")
     consent = db.query(ConsentRecord).filter(
         ConsentRecord.case_id == request.case_id,
         ConsentRecord.revoked == False
