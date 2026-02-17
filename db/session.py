@@ -29,3 +29,7 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+# register workflow sync listeners
+import models.workflow_events  # noqa: F401
