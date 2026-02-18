@@ -20,6 +20,8 @@ class Case(Base):
     # Runtime-aligned fields used by API routes/policy logic
     program_type = Column(String, nullable=True)
     program_key = Column(String, nullable=True)
+    meta = Column(JSON, nullable=True)
+
     case_type = Column(String, nullable=True)
     meta = Column(JSON, nullable=True)
     policy_version_id = Column(UUID(as_uuid=True), ForeignKey("policy_versions.id"))

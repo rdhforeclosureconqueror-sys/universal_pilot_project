@@ -1,18 +1,25 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
+
+from auth.dependencies import require_role
 from sqlalchemy.orm import Session
 
 from db.session import get_db
 from models.cases import Case
 from models.documents import Document
+from models.users import UserRole
 from services.workflow_engine import get_case_workflow_summary, initialize_case_workflow, sync_case_workflow
 
 router = APIRouter(prefix="/partner/v1", tags=["Partner API"])
 
 
 @router.get("/cases/{case_id}/status")
-def partner_case_status(case_id: UUID, db: Session = Depends(get_db)):
+def partner_case_status(
+    case_id: UUID,
+    db: Session = Depends(get_db),
+    _user=Depends(require_role([UserRole.partner_org, UserRole.admin, UserRole.audit_steward])),
+):
     case = db.query(Case).filter(Case.id == case_id).first()
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
@@ -25,7 +32,11 @@ def partner_case_status(case_id: UUID, db: Session = Depends(get_db)):
 
 
 @router.get("/cases/{case_id}/workflow-readiness")
-def partner_workflow_readiness(case_id: UUID, db: Session = Depends(get_db)):
+def partner_workflow_readiness(
+    case_id: UUID,
+    db: Session = Depends(get_db),
+    _user=Depends(require_role([UserRole.partner_org, UserRole.admin, UserRole.audit_steward])),
+):
     case = db.query(Case).filter(Case.id == case_id).first()
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
@@ -44,7 +55,11 @@ def partner_workflow_readiness(case_id: UUID, db: Session = Depends(get_db)):
 
 
 @router.get("/cases/{case_id}/evidence-verification")
-def partner_evidence_verification(case_id: UUID, db: Session = Depends(get_db)):
+def partner_evidence_verification(
+    case_id: UUID,
+    db: Session = Depends(get_db),
+    _user=Depends(require_role([UserRole.partner_org, UserRole.admin, UserRole.audit_steward])),
+):
     case = db.query(Case).filter(Case.id == case_id).first()
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")

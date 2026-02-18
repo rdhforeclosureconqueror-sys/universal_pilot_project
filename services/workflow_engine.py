@@ -163,6 +163,7 @@ def ensure_default_template(db: Session) -> WorkflowTemplate:
     template = (
         db.query(WorkflowTemplate)
         .filter(WorkflowTemplate.program_key == FORECLOSURE_PROGRAM_KEY)
+        .order_by(WorkflowTemplate.template_version.desc(), WorkflowTemplate.created_at.desc())
         .first()
     )
     if template:
@@ -249,17 +250,30 @@ def _case_document_set(db: Session, case_id) -> set[str]:
         .all()
     }
 
-
 def _evaluate_blocking_conditions(
     conditions: list[str],
     action_set: set[str],
 ) -> str | None:
+    """
+    Evaluates workflow blocking conditions against the current action set.
+    Returns a blocking reason string if blocked, otherwise None.
+    """
+
     for condition in conditions:
-        if condition == "requires_valid_contact_channel" and "valid_contact_channel_verified" not in action_set:
+        if (
+            condition == "requires_valid_contact_channel"
+            and "valid_contact_channel_verified" not in action_set
+        ):
             return "missing_contact_channel"
-        if condition == "compliance_overdue" and "compliance_current" not in action_set:
+
+        if (
+            condition == "compliance_overdue"
+            and "compliance_current" not in action_set
+        ):
             return "compliance_overdue"
+
     return None
+
 
 
 def evaluate_step_requirements(db: Session, case_id, step: WorkflowStep) -> dict[str, Any]:

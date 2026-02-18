@@ -78,6 +78,7 @@ def create_case(case_data: CaseCreateRequest, db: Session = Depends(get_db)):
         program_key=case_data.program_key,
         created_by=UUID(case_data.created_by),
         meta=incoming_meta,
+        created_by=UUID(case_data.created_by),
         created_at=now,
         policy_version_id=policy.id,
     )

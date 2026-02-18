@@ -15,7 +15,6 @@ from .normalizer import normalize
 
 logger = logging.getLogger(__name__)
 
-
 def _rows_from_text(raw_text: str) -> list[list[str]]:
     rows: list[list[str]] = []
 

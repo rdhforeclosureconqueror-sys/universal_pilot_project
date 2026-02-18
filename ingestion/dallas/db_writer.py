@@ -8,9 +8,11 @@ from models.audit_logs import AuditLog
 from models.cases import Case
 from models.deal_scores import DealScore
 from models.enums import CaseStatus
-from models.leads import Lead
 from models.properties import Property
-from services.workflow_engine import initialize_case_workflow, sync_case_workflow
+from services.workflow_engine import (
+    initialize_case_workflow,
+    sync_case_workflow,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -51,26 +53,8 @@ def _get_or_create_property(session: Session, record: dict) -> Property:
 
 
 # ---------------------------------------------------------
-# HELPERS
+# SCORING
 # ---------------------------------------------------------
-
-def _parse_opening_bid(value) -> float | None:
-    if value in (None, ""):
-        return None
-
-    if isinstance(value, (int, float)):
-        return float(value)
-
-    cleaned = str(value).replace("$", "").replace(",", "").strip()
-
-    if not cleaned:
-        return None
-
-    try:
-        return float(cleaned)
-    except Exception:
-        return None
-
 
 def _calculate_score(auction_date: datetime | None):
     urgency_days = None
@@ -107,6 +91,10 @@ def _calculate_score(auction_date: datetime | None):
     return score, tier, exit_strategy, urgency_days
 
 
+# ---------------------------------------------------------
+# CASE HELPERS
+# ---------------------------------------------------------
+
 def _case_status_from_record(raw_status) -> CaseStatus:
     try:
         return CaseStatus(str(raw_status).strip())
@@ -135,6 +123,19 @@ def _get_or_create_case(session: Session, prop: Property, record: dict):
     )
 
     if existing:
+        # Idempotency audit
+        session.add(
+            AuditLog(
+                id=uuid4(),
+                case_id=existing.id,
+                actor_id=None,
+                actor_is_ai=True,
+                action_type="ingestion_duplicate_detected",
+                reason_code="idempotent_replay",
+                before_json=None,
+                after_json={"canonical_key": canonical_key},
+            )
+        )
         return existing, False
 
     case = Case(
@@ -159,7 +160,7 @@ def _get_or_create_case(session: Session, prop: Property, record: dict):
 
 
 # ---------------------------------------------------------
-# DEAL SCORE
+# DEAL SCORE UPSERT
 # ---------------------------------------------------------
 
 def _get_or_create_deal_score(
@@ -195,61 +196,11 @@ def _get_or_create_deal_score(
         session.add(ds)
 
     session.flush()
+    return ds
 
 
 # ---------------------------------------------------------
-# LEAD UPSERT
-# ---------------------------------------------------------
-
-def _get_or_create_lead(
-    session: Session,
-    record: dict,
-    score: int,
-    tier: str,
-    exit_strategy: str,
-) -> Lead:
-
-    lead_id = (
-        record.get("external_id")
-        or record.get("case_number")
-        or f"lead-{uuid4().hex[:12]}"
-    )
-
-    lead = session.query(Lead).filter(Lead.lead_id == lead_id).first()
-
-    data = {
-        "lead_id": lead_id,
-        "source": record.get("source"),
-        "address": record.get("address", "").strip(),
-        "city": record.get("city", "Dallas").strip(),
-        "state": record.get("state", "TX").strip(),
-        "zip": record.get("zip", "").strip(),
-        "county": record.get("county", "Dallas").strip(),
-        "trustee": record.get("trustee", "").strip(),
-        "mortgagor": record.get("mortgagor", "").strip(),
-        "mortgagee": record.get("mortgagee", "").strip(),
-        "auction_date": record.get("auction_date"),
-        "case_number": record.get("case_number"),
-        "opening_bid": _parse_opening_bid(record.get("opening_bid")),
-        "status": record.get("status"),
-        "score": score,
-        "tier": tier,
-        "exit_strategy": exit_strategy,
-    }
-
-    if lead:
-        for k, v in data.items():
-            setattr(lead, k, v)
-    else:
-        lead = Lead(**data)
-        session.add(lead)
-
-    session.flush()
-    return lead
-
-
-# ---------------------------------------------------------
-# MAIN WRITER
+# PIPELINE ENTRYPOINT
 # ---------------------------------------------------------
 
 def write_to_db(record: dict, session: Session) -> None:
@@ -263,24 +214,19 @@ def write_to_db(record: dict, session: Session) -> None:
         case, created_case = _get_or_create_case(session, prop, record)
 
         _get_or_create_deal_score(
-            session,
-            case,
-            prop,
-            score,
-            tier,
-            exit_strategy,
-            urgency_days,
-        )
-
-        _get_or_create_lead(
-            session,
-            record,
-            score,
-            tier,
-            exit_strategy,
+            session=session,
+            case=case,
+            prop=prop,
+            score=score,
+            tier=tier,
+            exit_strategy=exit_strategy,
+            urgency_days=urgency_days,
         )
 
         if created_case:
+            initialize_case_workflow(session, case.id)
+            sync_case_workflow(session, case.id)
+
             session.add(
                 AuditLog(
                     id=uuid4(),
@@ -293,9 +239,6 @@ def write_to_db(record: dict, session: Session) -> None:
                     after_json={"source": record.get("source")},
                 )
             )
-
-            initialize_case_workflow(session, case.id)
-            sync_case_workflow(session, case.id)
 
         logger.info(
             "Upserted foreclosure entities for property %s (case_number=%s)",
