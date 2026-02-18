@@ -396,8 +396,7 @@ def write_to_db(record: dict, session: Session) -> None:
             tier=tier,
             exit_strategy=exit_strategy,
         )
-
-       if created_case:
+if created_case:
     session.add_all([
         AuditLog(
             id=uuid4(),
