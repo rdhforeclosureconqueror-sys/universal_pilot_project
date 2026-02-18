@@ -28,7 +28,6 @@ def foreclosure_kanban(db: Session = Depends(get_db)):
 
 
 @router.get("/workflow/analytics/foreclosure")
-@router.get("/workflow/analytics/foreclosure")
 def foreclosure_workflow_analytics(
     sla_days: int = 30,
     db: Session = Depends(get_db),
@@ -85,30 +84,34 @@ def report_sla_breaches(db: Session = Depends(get_db)):
 @router.get("/workflow/reports/refinance-ready")
 def report_refinance_ready(db: Session = Depends(get_db)):
     kanban = get_foreclosure_kanban(db)
+
     ready = next(
         (c for c in kanban["columns"] if c["name"] == "💰 Refinance Ready"),
         {"cases": []},
     )
+
     payload = {
         "refinance_ready_count": len(ready["cases"]),
         "cases": ready["cases"],
     }
-    db.commit()
-    return payload
 
+    db.commit()
     return payload
 
 
 @router.get("/cases/{case_id}/workflow")
 def case_workflow(case_id: UUID, db: Session = Depends(get_db)):
     case = db.query(Case).filter(Case.id == case_id).first()
+
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
 
     initialize_case_workflow(db, case.id)
     sync_case_workflow(db, case.id)
+
     summary = get_case_workflow_summary(db, case.id)
     db.commit()
+
     return summary
 
 
@@ -122,10 +125,12 @@ def workflow_override(
     user=Depends(require_role([UserRole.admin, UserRole.audit_steward])),
 ):
     case = db.query(Case).filter(Case.id == case_id).first()
+
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
 
     initialize_case_workflow(db, case.id)
+
     result = apply_workflow_override(
         db=db,
         case_id=case.id,
@@ -133,12 +138,17 @@ def workflow_override(
         actor_id=user.id,
         reason=reason,
         reason_category=reason_category,
-    
     )
+
     if not result:
-        raise HTTPException(status_code=400, detail="Invalid workflow override target")
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid workflow override target",
+        )
 
     sync_case_workflow(db, case.id)
+
     summary = get_case_workflow_summary(db, case.id)
     db.commit()
+
     return summary
