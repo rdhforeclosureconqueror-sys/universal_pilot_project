@@ -250,14 +250,30 @@ def _case_document_set(db: Session, case_id) -> set[str]:
         .all()
     }
 
+def _evaluate_blocking_conditions(
+    conditions: list[str],
+    action_set: set[str],
+) -> str | None:
+    """
+    Evaluates workflow blocking conditions against the current action set.
+    Returns a blocking reason string if blocked, otherwise None.
+    """
 
-def _evaluate_blocking_conditions(conditions: list[str], action_set: set[str]) -> str | None:
     for condition in conditions:
-        if condition == "requires_valid_contact_channel" and "valid_contact_channel_verified" not in action_set:
+        if (
+            condition == "requires_valid_contact_channel"
+            and "valid_contact_channel_verified" not in action_set
+        ):
             return "missing_contact_channel"
-        if condition == "compliance_overdue" and "compliance_current" not in action_set:
+
+        if (
+            condition == "compliance_overdue"
+            and "compliance_current" not in action_set
+        ):
             return "compliance_overdue"
+
     return None
+
 
 
 def evaluate_step_requirements(db: Session, case_id, step: WorkflowStep) -> dict[str, Any]:
@@ -632,5 +648,6 @@ def get_workflow_analytics(db: Session, default_sla_days: int = 30) -> dict[str,
             "override_by_actor": override_by_actor,
             "override_by_category": override_by_category,
             "override_by_case": override_by_case,
+            "sla_days": sla_days,
         },
     }

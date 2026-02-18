@@ -22,6 +22,8 @@ class Case(Base):
     program_key = Column(String, nullable=True)
     meta = Column(JSON, nullable=True)
 
+    case_type = Column(String, nullable=True)
+    meta = Column(JSON, nullable=True)
     policy_version_id = Column(UUID(as_uuid=True), ForeignKey("policy_versions.id"))
     property_id = Column(UUID(as_uuid=True), ForeignKey("properties.id"), nullable=True)
     auction_date = Column(DateTime(timezone=True), nullable=True)

@@ -320,7 +320,7 @@ const handleAuctionImport = async (event) => {
   formData.append("file", file);
 
   try {
-    const response = await fetch(`${getApiBase()}/upload`, {
+    const response = await fetch(`${getApiBase()}/auction-imports/upload`, {
       method: "POST",
       body: formData,
     });
@@ -356,7 +356,7 @@ const loadAuctionImports = async () => {
       const row = document.createElement("tr");
 
       const downloadLink = document.createElement("a");
-      downloadLink.href = new URL(`/imports/auction-files/${item.id}`, getApiBase()).toString();
+      downloadLink.href = new URL(`/auction-imports/auction-files/${item.id}`, getApiBase()).toString();
       downloadLink.textContent = "Download";
       downloadLink.target = "_blank";
       downloadLink.rel = "noopener noreferrer";
@@ -745,7 +745,6 @@ const loadDealScoreChart = async () => {
   }
 };
 document.addEventListener("DOMContentLoaded", () => {
-  loadAuctionImports(); // ✅ This triggers your table loading logic
+  initapp();
+  loadDealScoreChart();
 });
-
-loadDealScoreChart();

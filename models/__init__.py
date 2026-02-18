@@ -17,6 +17,8 @@ from .leads import Lead
 from .ai_scores import AIScore
 from .deal_scores import DealScore
 from .ingestion_metrics import IngestionMetric
+from .role_sessions import RoleSession
+
 from .botops import (
     BotSetting,
     BotReport,
