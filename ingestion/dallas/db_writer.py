@@ -397,14 +397,14 @@ def write_to_db(record: dict, session: Session) -> None:
             exit_strategy=exit_strategy,
         )
 
-        if created_case:
-            session.add_all([
-                AuditLog(
-                    id=uuid4(),
-                    case_id=case.id, )
-            },
+       if created_case:
+    session.add_all([
+        AuditLog(
+            id=uuid4(),
+            case_id=case.id,
         )
-    )
+    ])
+
 
     session.add(
         AuditLog(
