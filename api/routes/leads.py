@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from db import get_db  # Adjust if your db session import is different
+from db.session import get_db
 from models.leads import Lead
 
 router = APIRouter(prefix="/leads", tags=["leads"])
