@@ -378,6 +378,7 @@ def write_to_db(record: dict, session: Session) -> None:
         )
 
         case, created_case = _get_or_create_case(session, prop, record)
+
         _get_or_create_deal_score(
             session=session,
             case=case,
@@ -388,49 +389,45 @@ def write_to_db(record: dict, session: Session) -> None:
             urgency_days=urgency_days,
         )
 
-        session.add(deal_score)
-        lead = _get_or_create_lead(
+        _get_or_create_lead(
             session=session,
             record=record,
             score=score,
             tier=tier,
             exit_strategy=exit_strategy,
         )
-if created_case:
-    session.add_all([
-        AuditLog(
-            id=uuid4(),
-            case_id=case.id,
-        )
-    ])
 
+        if created_case:
+            session.add(
+                AuditLog(
+                    id=uuid4(),
+                    case_id=case.id,
+                    actor_id=None,
+                    actor_is_ai=True,
+                    action_type="auction_import_created",
+                    reason_code="system_ingest",
+                    before_json=None,
+                    after_json={"source": record.get("source")},
+                )
+            )
 
-    session.add(
-        AuditLog(
-            id=uuid4(),
-            case_id=case.id,
-            actor_id=None,
-            actor_is_ai=True,
-            action_type="auction_import_created",
-            reason_code="system_ingest",
-            before_json=None,
-            after_json={"source": record.get("source")},
-        )
-    )
+    except Exception:
+        session.rollback()
+        raise
 
-if created_lead:
-    session.add(
-        AuditLog(
-            id=uuid4(),
-            case_id=case.id,
-            actor_id=None,
-            actor_is_ai=True,
-            action_type="lead_created",
-            reason_code="system_ingest",
-            before_json=None,
-            after_json={"lead_id": lead.lead_id},
-        )
-    )
+        if created_lead:
+            session.add(
+                AuditLog(
+                    id=uuid4(),
+                    case_id=case.id,
+                    actor_id=None,
+                    actor_is_ai=True,
+                    action_type="lead_created",
+                    reason_code="system_ingest",
+                    before_json=None,
+                    after_json={"lead_id": lead.lead_id},
+                )
+            )
 
 # Initialize + sync workflow only when case is new
 if created_case:
