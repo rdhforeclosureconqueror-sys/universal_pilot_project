@@ -309,7 +309,7 @@ def _get_or_create_case(session: Session, prop: Property, record: dict):
         },
     )
 
-        session.add(case)
+    session.add(case)
     session.flush()
 
     session.add(
