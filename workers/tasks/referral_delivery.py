@@ -14,6 +14,9 @@ def process_referral_outbox(self, outbox_id: str):
     if not outbox:
         return
 
+    if outbox.processed_at is not None:
+        return
+
     # Update status
     outbox.attempts += 1
 
@@ -21,7 +24,10 @@ def process_referral_outbox(self, outbox_id: str):
         # Example: Mark referral as sent
         payload = outbox.payload
         referral = db.query(Referral).filter_by(id=payload["referral_id"]).first()
-        referral.status = "sent"
+        if referral is None:
+            raise ValueError("Referral not found for outbox payload")
+        if str(referral.status) != "sent":
+            referral.status = "sent"
         outbox.processed_at = datetime.utcnow()
 
         log_audit(

@@ -9,6 +9,7 @@ import csv
 import json
 import logging
 import hashlib
+from tempfile import NamedTemporaryFile
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 

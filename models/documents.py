@@ -1,4 +1,4 @@
-from sqlalchemy import Column, DateTime, ForeignKey, Enum, JSON
+from sqlalchemy import Column, DateTime, ForeignKey, Enum, JSON, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 import uuid
@@ -14,3 +14,4 @@ class Document(Base):
     doc_type = Column(Enum(DocumentType), nullable=False)
     meta = Column(JSON, nullable=True)
     uploaded_at = Column(DateTime(timezone=True), server_default=func.now())
+    file_url = Column(String, nullable=True)

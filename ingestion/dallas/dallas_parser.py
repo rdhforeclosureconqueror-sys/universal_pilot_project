@@ -34,32 +34,45 @@ def _find_date(cells: list[str]):
     return None
 
 
+# ------------------------------
+# Main Parser
+# ------------------------------
+
 def parse_dallas_row(row: List[str]) -> Optional[dict]:
-    cells = _normalize_row(row)
-    if not cells:
+    """
+    Parse a single row of Dallas auction data.
+    Returns dictionary or None if invalid.
+    """
+
+    if not row:
         return None
 
+    cells = row
+
+    # Skip headers and noise
     if _is_header_row(cells) or _is_noise_row(cells):
         return None
 
-    # Map expected values by position
+    # Extract by position (defensive)
     address = clean_address(_get_cell(cells, 0))
-    city = _get_cell(cells, 1).strip() or "Dallas"
-    state = _get_cell(cells, 2).strip() or "TX"
+    city = _get_cell(cells, 1) or "Dallas"
+    state = _get_cell(cells, 2) or "TX"
     zip_code = clean_zip(_get_cell(cells, 3))
-    county = _get_cell(cells, 4).strip() or "Dallas"
-    trustee = _get_cell(cells, 5).strip()
-    mortgagor = _get_cell(cells, 6).strip()
-    mortgagee = _get_cell(cells, 7).strip()
-    auction_date = parse_date(_get_cell(cells, 8))
+    county = _get_cell(cells, 4) or "Dallas"
+    trustee = _get_cell(cells, 5)
+    mortgagor = _get_cell(cells, 6)
+    mortgagee = _get_cell(cells, 7)
+    auction_date = _parse_date(_get_cell(cells, 8))
     case_number = normalize_case_number(_get_cell(cells, 9))
     opening_bid = _get_cell(cells, 10).strip() if len(cells) > 10 else None
 
-    # Fallback for auction date
+    # Fallback: search entire row for date
     if not auction_date:
         auction_date = _find_date(cells)
 
-    if not address or not zip_code or not auction_date:
+    # Minimum requirement: address only
+    # (Relaxed so ingestion actually works)
+    if not address:
         return None
 
     return {

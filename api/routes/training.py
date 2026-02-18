@@ -1,12 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from auth.authorization import PolicyAuthorizer
 from auth.dependencies import get_current_user
 from db.session import get_db
 from models.training_quiz_attempts import TrainingQuizAttempt
-from models.certifications import Certification
-from models.policy_versions import PolicyVersion
-from models.cases import Case  # ✅ FIXED: missing import
+from models.cases import Case
 from audit.logger import log_audit
 from policy.loader import PolicyEngine
 from uuid import uuid4
@@ -14,16 +13,19 @@ from datetime import datetime
 
 router = APIRouter(prefix="/training", tags=["Training"])
 
+
 class QuizSubmission(BaseModel):
     case_id: str
     quiz_key: str
     answers: dict
 
+
 @router.post("/quiz_attempt", status_code=201)
 def submit_quiz_attempt(request: QuizSubmission, db: Session = Depends(get_db), user=Depends(get_current_user)):
-    # Load policy and config
-    case = db.query(Case).filter_by(id=request.case_id).first()  # ✅ FIXED: models.Case -> Case
-    if not case or case.case_type != "training_enrollment":
+    PolicyAuthorizer(db).require_case_action(user=user, case_id=request.case_id, action="training.quiz_attempt")
+
+    case = db.query(Case).filter_by(id=request.case_id).first()
+    if not case or (case.case_type != "training_enrollment" and case.program_type != "training_enrollment"):
         raise HTTPException(status_code=400, detail="Not a training case")
 
     policy = PolicyEngine(db).get_policy_by_id(case.policy_version_id).config_json
@@ -32,7 +34,6 @@ def submit_quiz_attempt(request: QuizSubmission, db: Session = Depends(get_db), 
     if not quiz_config:
         raise HTTPException(status_code=404, detail="Quiz not found in policy")
 
-    # Evaluate quiz
     correct_count = 0
     for q in quiz_config.get("questions", []):
         if q["prompt"] in request.answers and request.answers[q["prompt"]] == q["correct_answer"]:

@@ -20,7 +20,7 @@ import models  # ensures all models are registered with Base.metadata
 config = context.config
 
 # ✅ Set SQLAlchemy URL from environment
-config.set_main_option("sqlalchemy.url", os.getenv("DATABASE_URL"))
+config.set_main_option("sqlalchemy.url", os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/universal_case_os"))
 
 # ✅ Logging configuration
 if config.config_file_name is not None:
