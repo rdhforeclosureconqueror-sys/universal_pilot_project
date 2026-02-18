@@ -4,6 +4,8 @@ import json
 
 from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException
 from sqlalchemy.orm import Session
+
+from audit.logger import log_audit
 from models.documents import Document, DocumentType
 from models.audit_logs import AuditLog
 from db.session import get_db

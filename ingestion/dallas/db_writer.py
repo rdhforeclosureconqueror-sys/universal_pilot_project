@@ -55,7 +55,7 @@ def _get_or_create_property(session: Session, record: dict) -> Property:
 # HELPERS
 # ---------------------------------------------------------
 
-def _parse_opening_bid(value) -> Optional[float]:
+def _parse_opening_bid(value) -> float | None:
     if value in (None, ""):
         return None
 
@@ -64,13 +64,16 @@ def _parse_opening_bid(value) -> Optional[float]:
 
     cleaned = str(value).replace("$", "").replace(",", "").strip()
 
+    if not cleaned:
+        return None
+
     try:
         return float(cleaned)
     except Exception:
         return None
 
 
-def _safe_case_status(value: Optional[str]) -> CaseStatus:
+def _safe_case_status(value: str | None) -> CaseStatus:
     if not value:
         return CaseStatus.PRE_FORECLOSURE
 
@@ -85,8 +88,8 @@ def _safe_case_status(value: Optional[str]) -> CaseStatus:
 
 
 def _calculate_score(
-    auction_date: Optional[datetime],
-) -> tuple[int, str, str, Optional[int]]:
+    auction_date: datetime | None,
+) -> tuple[int, str, str, int | None]:
     urgency_days = None
 
     if auction_date:
@@ -182,7 +185,7 @@ def _get_or_create_lead(
 # ---------------------------------------------------------
 
 def write_to_db(record: dict, session: Session) -> None:
-
+   
     try:
         return float(cleaned)
     except ValueError:
@@ -232,6 +235,19 @@ def _get_or_create_lead(
     session.flush()
     return lead
 
+def _case_status_from_record(raw_status) -> CaseStatus:
+    if raw_status is None:
+        return CaseStatus.PRE_FORECLOSURE
+
+    token = str(raw_status).strip()
+    if not token:
+        return CaseStatus.PRE_FORECLOSURE
+
+    try:
+        return CaseStatus(token)
+    except Exception:
+        return CaseStatus.PRE_FORECLOSURE
+
 
 def _case_canonical_key(prop: Property, auction_date, record: dict) -> str:
     date_token = auction_date.isoformat() if auction_date else "unknown"
@@ -264,7 +280,7 @@ def _get_or_create_case(session: Session, prop: Property, record: dict):
         )
         return existing, False
 
-    # Split canonical vs extra metadata
+    # Canonical vs extra metadata split
     canonical_fields = {
         "external_id", "address", "city", "state", "zip", "county",
         "trustee", "mortgagor", "mortgagee", "auction_date", "source",
@@ -279,7 +295,7 @@ def _get_or_create_case(session: Session, prop: Property, record: dict):
 
     case = Case(
         id=uuid4(),
-        status=CaseStatus.get(record.get("status", "PRE_FORECLOSURE")),
+        status=_case_status_from_record(record.get("status")),
         created_by=uuid4(),
         program_type="FORECLOSURE_PREVENTION",
         program_key="foreclosure_stabilization_v1",
@@ -289,14 +305,31 @@ def _get_or_create_case(session: Session, prop: Property, record: dict):
         meta={
             "source": record.get("source"),
             "case_number": record.get("case_number"),
-            "extra_fields": extra_fields if extra_fields else {},
+            **extra_fields,
         },
     )
 
-    session.add(case)
+        session.add(case)
     session.flush()
 
+    session.add(
+        AuditLog(
+            id=uuid4(),
+            case_id=case.id,
+            actor_id=None,
+            actor_is_ai=True,
+            action_type="case_created_from_ingestion",
+            reason_code="auction_import",
+            before_json=None,
+            after_json={
+                "canonical_key": canonical_key,
+                "extra_fields": extra_fields if extra_fields else {},
+            },
+        )
+    )
+
     return case, True
+
 
 
 def _get_or_create_deal_score(
@@ -322,8 +355,10 @@ def _get_or_create_deal_score(
     else:
         ds = DealScore(
             id=uuid4(),
+
             case_id=case.id,
             property_id=prop.id,
+
             score=score,
             tier=tier,
             exit_strategy=exit_strategy,
@@ -362,30 +397,11 @@ def write_to_db(record: dict, session: Session) -> None:
             exit_strategy=exit_strategy,
         )
 
-        # Create / upsert lead (should already be done above this block)
-lead, created_lead = _get_or_create_lead(
-    session=session,
-    record=record,
-    score=score,
-    tier=tier,
-    exit_strategy=exit_strategy,
-)
-
-# Audit logging — only when entities are newly created
-if created_case:
-    session.add(
-        AuditLog(
-            id=uuid4(),
-            case_id=case.id,
-            actor_id=None,
-            actor_is_ai=True,
-            action_type="case_created",
-            reason_code="system_ingest",
-            before_json=None,
-            after_json={
-                "status": case.status.value
-                if hasattr(case.status, "value")
-                else str(case.status)
+        if created_case:
+            session.add_all([
+                AuditLog(
+                    id=uuid4(),
+                    case_id=case.id, )
             },
         )
     )

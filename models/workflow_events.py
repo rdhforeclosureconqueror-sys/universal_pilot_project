@@ -19,6 +19,27 @@ def _sync_case_on_event(connection, case_id):
         session.close()
 
 
+# Evidence tables are immutable after insert to preserve audit integrity.
+@event.listens_for(Document, "before_update")
+def _document_before_update(mapper, connection, target):
+    raise ValueError("Documents are immutable; create a new document record instead of update")
+
+
+@event.listens_for(Document, "before_delete")
+def _document_before_delete(mapper, connection, target):
+    raise ValueError("Documents are immutable; deletion is not allowed")
+
+
+@event.listens_for(AuditLog, "before_update")
+def _audit_before_update(mapper, connection, target):
+    raise ValueError("Audit logs are immutable; update is not allowed")
+
+
+@event.listens_for(AuditLog, "before_delete")
+def _audit_before_delete(mapper, connection, target):
+    raise ValueError("Audit logs are immutable; deletion is not allowed")
+
+
 @event.listens_for(Document, "after_insert")
 def _document_after_insert(mapper, connection, target):
     _sync_case_on_event(connection, target.case_id)

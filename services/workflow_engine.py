@@ -9,9 +9,13 @@ from models.audit_logs import AuditLog
 from models.cases import Case
 from models.documents import Document
 from models.enums import CaseStatus
+from models.leads import Lead
+from models.properties import Property
 from models.workflow import (
     CaseWorkflowInstance,
     CaseWorkflowProgress,
+    WorkflowOverride,
+    WorkflowOverrideCategory,
     WorkflowResponsibleRole,
     WorkflowStep,
     WorkflowStepStatus,
@@ -19,6 +23,7 @@ from models.workflow import (
 )
 
 FORECLOSURE_PROGRAM_KEY = "foreclosure_stabilization_v1"
+MAX_OVERRIDES_PER_CASE = 3
 
 DEFAULT_FORECLOSURE_STEPS: list[dict[str, Any]] = [
     {
@@ -31,6 +36,7 @@ DEFAULT_FORECLOSURE_STEPS: list[dict[str, Any]] = [
         "kanban_column": "📥 Lead Ingested",
         "order_index": 1,
         "auto_advance": True,
+        "sla_days": 1,
     },
     {
         "step_key": "contact_homeowner",
@@ -42,6 +48,7 @@ DEFAULT_FORECLOSURE_STEPS: list[dict[str, Any]] = [
         "kanban_column": "📞 Contact & Qualification",
         "order_index": 2,
         "auto_advance": False,
+        "sla_days": 3,
     },
     {
         "step_key": "qualification_review",
@@ -53,6 +60,7 @@ DEFAULT_FORECLOSURE_STEPS: list[dict[str, Any]] = [
         "kanban_column": "📄 Intake Complete",
         "order_index": 3,
         "auto_advance": False,
+        "sla_days": 5,
     },
     {
         "step_key": "leaseback_execution",
@@ -64,6 +72,7 @@ DEFAULT_FORECLOSURE_STEPS: list[dict[str, Any]] = [
         "kanban_column": "⚖️ Stabilization Setup",
         "order_index": 4,
         "auto_advance": True,
+        "sla_days": 7,
     },
     {
         "step_key": "stabilization_monitoring",
@@ -75,6 +84,7 @@ DEFAULT_FORECLOSURE_STEPS: list[dict[str, Any]] = [
         "kanban_column": "🏠 Leaseback Active",
         "order_index": 5,
         "auto_advance": False,
+        "sla_days": 30,
     },
     {
         "step_key": "rehab_planning",
@@ -86,6 +96,7 @@ DEFAULT_FORECLOSURE_STEPS: list[dict[str, Any]] = [
         "kanban_column": "🔨 Rehab Planning",
         "order_index": 6,
         "auto_advance": False,
+        "sla_days": 14,
     },
     {
         "step_key": "rehab_execution",
@@ -97,6 +108,7 @@ DEFAULT_FORECLOSURE_STEPS: list[dict[str, Any]] = [
         "kanban_column": "🛠 Rehab In Progress",
         "order_index": 7,
         "auto_advance": False,
+        "sla_days": 45,
     },
     {
         "step_key": "performance_window",
@@ -108,6 +120,7 @@ DEFAULT_FORECLOSURE_STEPS: list[dict[str, Any]] = [
         "kanban_column": "📊 Performance Window",
         "order_index": 8,
         "auto_advance": False,
+        "sla_days": 180,
     },
     {
         "step_key": "refinance_ready",
@@ -124,6 +137,7 @@ DEFAULT_FORECLOSURE_STEPS: list[dict[str, Any]] = [
         "kanban_column": "💰 Refinance Ready",
         "order_index": 9,
         "auto_advance": False,
+        "sla_days": 14,
     },
     {
         "step_key": "completion",
@@ -140,6 +154,7 @@ DEFAULT_FORECLOSURE_STEPS: list[dict[str, Any]] = [
         "kanban_column": "🎓 Completed",
         "order_index": 10,
         "auto_advance": False,
+        "sla_days": 7,
     },
 ]
 
@@ -156,6 +171,7 @@ def ensure_default_template(db: Session) -> WorkflowTemplate:
     template = WorkflowTemplate(
         program_key=FORECLOSURE_PROGRAM_KEY,
         name="Foreclosure Stabilization v1",
+        template_version=1,
     )
     db.add(template)
     db.flush()
@@ -184,6 +200,7 @@ def initialize_case_workflow(db: Session, case_id) -> CaseWorkflowInstance:
     instance = CaseWorkflowInstance(
         case_id=case_id,
         template_id=template.id,
+        locked_template_version=template.template_version,
         current_step_key=first_step.step_key,
     )
     db.add(instance)
@@ -277,6 +294,15 @@ def _update_case_status_for_step(db: Session, case: Case, step_key: str):
     db.flush()
 
 
+def _sla_breached(progress: CaseWorkflowProgress, step: WorkflowStep, now: datetime | None = None) -> bool:
+    if progress.status not in (WorkflowStepStatus.active, WorkflowStepStatus.blocked):
+        return False
+    if not progress.started_at:
+        return False
+    now = now or datetime.now(timezone.utc)
+    return (now - progress.started_at).days > (step.sla_days or 0)
+
+
 def sync_case_workflow(db: Session, case_id) -> CaseWorkflowInstance | None:
     instance = (
         db.query(CaseWorkflowInstance)
@@ -285,6 +311,11 @@ def sync_case_workflow(db: Session, case_id) -> CaseWorkflowInstance | None:
     )
     if not instance:
         return None
+
+    template = db.query(WorkflowTemplate).filter(WorkflowTemplate.id == instance.template_id).first()
+    if template and instance.locked_template_version != template.template_version:
+        # version-lock: do not drift implicitly
+        return instance
 
     steps = _ordered_steps(db, instance.template_id)
     progress_map = {
@@ -363,6 +394,7 @@ def get_case_workflow_summary(db: Session, case_id) -> dict[str, Any] | None:
         "next_required_actions": evaluation["missing_actions"],
         "missing_documents": evaluation["missing_documents"],
         "blocking_conditions": current_step.blocking_conditions if current_step else [],
+        "template_version": instance.locked_template_version,
         "timeline_history": [
             {
                 "step_key": p.step_key,
@@ -370,6 +402,8 @@ def get_case_workflow_summary(db: Session, case_id) -> dict[str, Any] | None:
                 "started_at": p.started_at,
                 "completed_at": p.completed_at,
                 "block_reason": p.block_reason,
+                "sla_days": step_map[p.step_key].sla_days if p.step_key in step_map else None,
+                "sla_breach": _sla_breached(p, step_map[p.step_key]) if p.step_key in step_map else False,
                 "kanban_column": step_map[p.step_key].kanban_column if p.step_key in step_map else None,
             }
             for p in progress_rows
@@ -378,10 +412,15 @@ def get_case_workflow_summary(db: Session, case_id) -> dict[str, Any] | None:
 
 
 def get_foreclosure_kanban(db: Session) -> dict[str, Any]:
-    ensure_default_template(db)
+    template = ensure_default_template(db)
+    ordered_steps = _ordered_steps(db, template.id)
+    ordered_columns = []
+    for step in ordered_steps:
+        if step.kanban_column not in ordered_columns:
+            ordered_columns.append(step.kanban_column)
 
     instances = db.query(CaseWorkflowInstance).all()
-    column_map: dict[str, list[dict[str, Any]]] = {}
+    column_map: dict[str, list[dict[str, Any]]] = {name: [] for name in ordered_columns}
 
     for instance in instances:
         case = db.query(Case).filter(Case.id == instance.case_id).first()
@@ -396,19 +435,30 @@ def get_foreclosure_kanban(db: Session) -> dict[str, Any]:
         current = next((s for s in summary["timeline_history"] if s["step_key"] == summary["current_step"]), None)
         column_name = current["kanban_column"] if current else "Unmapped"
 
+        prop = db.query(Property).filter(Property.id == case.property_id).first() if case.property_id else None
+        lead = None
+        if prop:
+            lead = (
+                db.query(Lead)
+                .filter(Lead.address == prop.address, Lead.zip == prop.zip)
+                .order_by(Lead.created_at.desc())
+                .first()
+            )
+
         days_in_stage = 0
         if current and current["started_at"]:
             days_in_stage = (datetime.now(timezone.utc) - current["started_at"]).days
 
         case_card = {
             "case_id": str(case.id),
-            "homeowner_name": None,
-            "address": None,
+            "homeowner_name": (lead.mortgagor if lead and lead.mortgagor else (prop.mortgagor if prop else None)),
+            "address": prop.address if prop else (lead.address if lead else None),
             "days_in_stage": days_in_stage,
             "block_reason": current["block_reason"] if current else None,
             "missing_documents": summary["missing_documents"],
             "next_required_actions": summary["next_required_actions"],
             "compliance_overdue": current["block_reason"] == "compliance_overdue" if current else False,
+            "sla_breach": current["sla_breach"] if current else False,
             "blocked": current["status"] == WorkflowStepStatus.blocked.value if current else False,
         }
 
@@ -417,25 +467,33 @@ def get_foreclosure_kanban(db: Session) -> dict[str, Any]:
     columns = [
         {
             "name": name,
-            "cases": sorted(cards, key=lambda x: x["days_in_stage"], reverse=True),
+            "cases": sorted(column_map.get(name, []), key=lambda x: x["days_in_stage"], reverse=True),
         }
-        for name, cards in column_map.items()
+        for name in ordered_columns
     ]
-
-    columns.sort(key=lambda c: c["name"])
+    if "Unmapped" in column_map:
+        columns.append({"name": "Unmapped", "cases": column_map["Unmapped"]})
     return {"columns": columns}
 
 
-
-def apply_workflow_override(db: Session, case_id, to_step_key: str, actor_id, reason: str):
-    from models.workflow import WorkflowOverride
-
+def apply_workflow_override(
+    db: Session,
+    case_id,
+    to_step_key: str,
+    actor_id,
+    reason: str,
+    reason_category: WorkflowOverrideCategory,
+):
     instance = (
         db.query(CaseWorkflowInstance)
         .filter(CaseWorkflowInstance.case_id == case_id)
         .first()
     )
     if not instance:
+        return None
+
+    override_count = db.query(WorkflowOverride).filter(WorkflowOverride.case_id == case_id).count()
+    if override_count >= MAX_OVERRIDES_PER_CASE:
         return None
 
     steps = _ordered_steps(db, instance.template_id)
@@ -479,6 +537,7 @@ def apply_workflow_override(db: Session, case_id, to_step_key: str, actor_id, re
             instance_id=instance.id,
             from_step_key=from_step,
             to_step_key=to_step_key,
+            reason_category=reason_category,
             reason=reason,
             actor_id=actor_id,
         )
@@ -491,15 +550,16 @@ def apply_workflow_override(db: Session, case_id, to_step_key: str, actor_id, re
             action_type="workflow_override",
             reason_code="manual_override",
             before_json={"from_step": from_step},
-            after_json={"to_step": to_step_key, "reason": reason},
+            after_json={"to_step": to_step_key, "reason": reason, "reason_category": reason_category.value},
         )
     )
     db.flush()
     return instance
 
 
-def get_workflow_analytics(db: Session, sla_days: int = 30) -> dict[str, Any]:
-    ensure_default_template(db)
+def get_workflow_analytics(db: Session, default_sla_days: int = 30) -> dict[str, Any]:
+    template = ensure_default_template(db)
+    step_map = {s.step_key: s for s in _ordered_steps(db, template.id)}
 
     instances = db.query(CaseWorkflowInstance).all()
     now = datetime.now(timezone.utc)
@@ -509,6 +569,7 @@ def get_workflow_analytics(db: Session, sla_days: int = 30) -> dict[str, Any]:
     block_reason_frequency: dict[str, int] = {}
     sla_breach_count = 0
     compliance_delay_count = 0
+    time_risk_count = 0
     case_stage_duration: dict[str, int] = {}
 
     for instance in instances:
@@ -524,10 +585,15 @@ def get_workflow_analytics(db: Session, sla_days: int = 30) -> dict[str, Any]:
             duration = max(0, (end - p.started_at).days)
             stage_durations.setdefault(p.step_key, []).append(duration)
 
-            if p.status == WorkflowStepStatus.active and p.step_key == instance.current_step_key:
+            if p.status in (WorkflowStepStatus.active, WorkflowStepStatus.blocked) and p.step_key == instance.current_step_key:
                 case_stage_duration[str(instance.case_id)] = duration
-                if duration > sla_days:
-                    sla_breach_count += 1
+
+            step = step_map.get(p.step_key)
+            step_sla = step.sla_days if step else default_sla_days
+            if p.status in (WorkflowStepStatus.active, WorkflowStepStatus.blocked) and duration > step_sla:
+                sla_breach_count += 1
+                if p.status == WorkflowStepStatus.active:
+                    time_risk_count += 1
 
             if p.status == WorkflowStepStatus.blocked:
                 blocked_cases += 1
@@ -535,6 +601,18 @@ def get_workflow_analytics(db: Session, sla_days: int = 30) -> dict[str, Any]:
                 block_reason_frequency[reason] = block_reason_frequency.get(reason, 0) + 1
                 if reason == "compliance_overdue":
                     compliance_delay_count += 1
+
+    override_rows = db.query(WorkflowOverride).all()
+    override_by_actor: dict[str, int] = {}
+    override_by_category: dict[str, int] = {}
+    override_by_case: dict[str, int] = {}
+    for r in override_rows:
+        aid = str(r.actor_id)
+        override_by_actor[aid] = override_by_actor.get(aid, 0) + 1
+        cat = r.reason_category.value if hasattr(r.reason_category, "value") else str(r.reason_category)
+        override_by_category[cat] = override_by_category.get(cat, 0) + 1
+        cid = str(r.case_id)
+        override_by_case[cid] = override_by_case.get(cid, 0) + 1
 
     avg_days_per_stage = {
         step: (sum(vals) / len(vals) if vals else 0)
@@ -549,7 +627,13 @@ def get_workflow_analytics(db: Session, sla_days: int = 30) -> dict[str, Any]:
             "blocked_case_count": blocked_cases,
             "block_reason_frequency": block_reason_frequency,
             "sla_breach_count": sla_breach_count,
+            "time_risk_count": time_risk_count,
             "compliance_delay_count": compliance_delay_count,
+            "default_sla_days": default_sla_days,
+            "override_count": len(override_rows),
+            "override_by_actor": override_by_actor,
+            "override_by_category": override_by_category,
+            "override_by_case": override_by_case,
             "sla_days": sla_days,
         },
     }

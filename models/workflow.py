@@ -22,12 +22,20 @@ class WorkflowStepStatus(enum.Enum):
     complete = "complete"
 
 
+class WorkflowOverrideCategory(enum.Enum):
+    data_correction = "data_correction"
+    legal_exception = "legal_exception"
+    executive_directive = "executive_directive"
+    system_recovery = "system_recovery"
+
+
 class WorkflowTemplate(Base):
     __tablename__ = "workflow_templates"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     program_key = Column(String, nullable=False, index=True)
     name = Column(String, nullable=False)
+    template_version = Column(Integer, nullable=False, default=1)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -45,6 +53,7 @@ class WorkflowStep(Base):
     kanban_column = Column(String, nullable=False)
     order_index = Column(Integer, nullable=False)
     auto_advance = Column(Boolean, nullable=False, default=False)
+    sla_days = Column(Integer, nullable=False, default=30)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -54,6 +63,7 @@ class CaseWorkflowInstance(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     case_id = Column(UUID(as_uuid=True), ForeignKey("cases.id"), nullable=False, unique=True, index=True)
     template_id = Column(UUID(as_uuid=True), ForeignKey("workflow_templates.id"), nullable=False, index=True)
+    locked_template_version = Column(Integer, nullable=False, default=1)
     current_step_key = Column(String, nullable=False)
     started_at = Column(DateTime(timezone=True), server_default=func.now())
     completed_at = Column(DateTime(timezone=True), nullable=True)
@@ -79,6 +89,7 @@ class WorkflowOverride(Base):
     instance_id = Column(UUID(as_uuid=True), ForeignKey("case_workflow_instances.id"), nullable=False, index=True)
     from_step_key = Column(String, nullable=False)
     to_step_key = Column(String, nullable=False)
+    reason_category = Column(Enum(WorkflowOverrideCategory), nullable=False)
     reason = Column(String, nullable=False)
     actor_id = Column(UUID(as_uuid=True), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
