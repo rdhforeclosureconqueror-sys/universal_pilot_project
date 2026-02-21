@@ -1,7 +1,7 @@
 """workflow system + ingestion hardening
 
 Revision ID: 001_workflow_system
-Revises: baseline_001
+Revises: "baseline_001"
 Create Date: 2026-02-18
 """
 
@@ -11,7 +11,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers
 revision = "001_workflow_system"
-down_revision = baseline_001
+down_revision = "baseline_001"
 branch_labels = None
 depends_on = None
 
