@@ -13,7 +13,14 @@ class Case(Base):
     )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    status = Column(Enum(CaseStatus), nullable=False)
+    status = Column(
+        Enum(
+            CaseStatus,
+            name="casestatus",
+            create_type=False
+        ),
+        nullable=False
+    ) 
     created_by = Column(UUID(as_uuid=True), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
