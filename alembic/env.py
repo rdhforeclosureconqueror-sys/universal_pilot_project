@@ -20,7 +20,9 @@ import models  # ensures all models are registered with Base.metadata
 config = context.config
 
 # ✅ Set SQLAlchemy URL from environment
-config.set_main_option("sqlalchemy.url", os.getenv("DATABASE_URL"))
+database_url = os.getenv("DATABASE_URL")
+if database_url:
+    config.set_main_option("sqlalchemy.url", database_url)
 
 # ✅ Logging configuration
 if config.config_file_name is not None:
