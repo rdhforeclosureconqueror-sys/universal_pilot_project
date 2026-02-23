@@ -1,7 +1,7 @@
 """
 Documents + Audit Logs + Immutability Enforcement
 
-Revision ID: 003_documents_and_audit_immutability
+Revision ID: "003_docs_audit"
 Revises: 002_governance_guards
 Create Date: 2026-02-18
 """
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers
-revision = "003_documents_and_audit_immutability"
+revision = "003_docs_audit"
 down_revision = "002_governance_guards"
 branch_labels = None
 depends_on = None
