@@ -27,7 +27,7 @@ from services.workflow_engine import (
 
 def _session():
     engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
-    Base.metadata.create_all(engine)
+    
     Session = sessionmaker(bind=engine, autoflush=False, autocommit=False)
     return Session()
 
