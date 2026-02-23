@@ -1,4 +1,5 @@
-"""governance guards + immutability enforcement
+"""
+Governance guards – workflow only
 
 Revision ID: 002_governance_guards
 Revises: 001_workflow_system
@@ -56,76 +57,6 @@ def upgrade() -> None:
         """
     )
 
-    # -------------------------------------------------
-    # DOCUMENTS IMMUTABILITY
-    # -------------------------------------------------
-
-    op.execute(
-        """
-        CREATE OR REPLACE FUNCTION prevent_documents_mutation()
-        RETURNS trigger AS $$
-        BEGIN
-            RAISE EXCEPTION
-            'documents are immutable; operation=% is not allowed',
-            TG_OP;
-        END;
-        $$ LANGUAGE plpgsql;
-        """
-    )
-
-    op.execute(
-        """
-        CREATE TRIGGER trg_prevent_documents_update
-        BEFORE UPDATE ON documents
-        FOR EACH ROW
-        EXECUTE FUNCTION prevent_documents_mutation();
-        """
-    )
-
-    op.execute(
-        """
-        CREATE TRIGGER trg_prevent_documents_delete
-        BEFORE DELETE ON documents
-        FOR EACH ROW
-        EXECUTE FUNCTION prevent_documents_mutation();
-        """
-    )
-
-    # -------------------------------------------------
-    # AUDIT LOGS IMMUTABILITY
-    # -------------------------------------------------
-
-    op.execute(
-        """
-        CREATE OR REPLACE FUNCTION prevent_audit_logs_mutation()
-        RETURNS trigger AS $$
-        BEGIN
-            RAISE EXCEPTION
-            'audit_logs are immutable; operation=% is not allowed',
-            TG_OP;
-        END;
-        $$ LANGUAGE plpgsql;
-        """
-    )
-
-    op.execute(
-        """
-        CREATE TRIGGER trg_prevent_audit_logs_update
-        BEFORE UPDATE ON audit_logs
-        FOR EACH ROW
-        EXECUTE FUNCTION prevent_audit_logs_mutation();
-        """
-    )
-
-    op.execute(
-        """
-        CREATE TRIGGER trg_prevent_audit_logs_delete
-        BEFORE DELETE ON audit_logs
-        FOR EACH ROW
-        EXECUTE FUNCTION prevent_audit_logs_mutation();
-        """
-    )
-
 
 # -------------------------------------------------
 # DOWNGRADE
@@ -134,27 +65,9 @@ def upgrade() -> None:
 def downgrade() -> None:
 
     op.execute(
-        "DROP TRIGGER IF EXISTS trg_prevent_audit_logs_delete ON audit_logs;"
-    )
-    op.execute(
-        "DROP TRIGGER IF EXISTS trg_prevent_audit_logs_update ON audit_logs;"
-    )
-    op.execute(
-        "DROP TRIGGER IF EXISTS trg_prevent_documents_delete ON documents;"
-    )
-    op.execute(
-        "DROP TRIGGER IF EXISTS trg_prevent_documents_update ON documents;"
-    )
-    op.execute(
         "DROP TRIGGER IF EXISTS trg_enforce_workflow_override_limit ON workflow_overrides;"
     )
 
-    op.execute(
-        "DROP FUNCTION IF EXISTS prevent_audit_logs_mutation();"
-    )
-    op.execute(
-        "DROP FUNCTION IF EXISTS prevent_documents_mutation();"
-    )
     op.execute(
         "DROP FUNCTION IF EXISTS enforce_workflow_override_limit();"
     )
