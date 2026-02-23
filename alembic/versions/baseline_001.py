@@ -1,5 +1,5 @@
 """
-Baseline migration - consolidated schema
+Baseline migration - core system only
 
 Revision ID: baseline_001
 Revises: None
@@ -18,168 +18,142 @@ depends_on = None
 
 
 # --------------------------------------------------
-# ENUM DEFINITIONS (NO AUTO CREATE)
+# CORE ENUMS (NON-WORKFLOW ONLY)
 # --------------------------------------------------
 
-workflow_responsible_role = sa.Enum(
-    "operator", "occupant", "system", "lender",
-    name="workflowresponsiblerole",
-    create_type=False
+case_status_enum = sa.Enum(
+    "intake_submitted",
+    "intake_incomplete",
+    "under_review",
+    "in_progress",
+    "program_completed_positive_outcome",
+    "case_closed_other_outcome",
+    "auction_intake",
+    name="casestatus",
 )
 
-workflow_step_status = sa.Enum(
-    "pending", "active", "blocked", "complete",
-    name="workflowstepstatus",
-    create_type=False
+user_role_enum = sa.Enum(
+    "case_worker",
+    "referral_coordinator",
+    "admin",
+    "audit_steward",
+    "ai_policy_chair",
+    "partner_org",
+    name="userrole",
 )
 
+
+# --------------------------------------------------
+# UPGRADE
+# --------------------------------------------------
 
 def upgrade():
 
     bind = op.get_bind()
 
-    # --------------------------------------------------
-    # CREATE ENUMS FIRST (MANUAL CONTROL)
-    # --------------------------------------------------
-
-    workflow_responsible_role.create(bind)
-    workflow_step_status.create(bind)
+    # Create core enums
+    case_status_enum.create(bind, checkfirst=True)
+    user_role_enum.create(bind, checkfirst=True)
 
     # --------------------------------------------------
-    # WORKFLOW TABLES
+    # USERS
     # --------------------------------------------------
 
     op.create_table(
-        "workflow_templates",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("program_key", sa.String(), nullable=False),
-        sa.Column("name", sa.String(), nullable=False),
-        sa.Column(
-            "created_at",
-            sa.DateTime(timezone=True),
-            server_default=sa.text("now()")
-        ),
-    )
-
-    op.create_table(
-        "workflow_steps",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column(
-            "template_id",
-            postgresql.UUID(as_uuid=True),
-            sa.ForeignKey("workflow_templates.id"),
-            nullable=False
-        ),
-        sa.Column("step_key", sa.String(), nullable=False),
-        sa.Column("display_name", sa.String(), nullable=False),
-        sa.Column(
-            "responsible_role",
-            workflow_responsible_role,
-            nullable=False
-        ),
-        sa.Column(
-            "required_documents",
-            sa.JSON(),
-            server_default=sa.text("'[]'::json"),
-            nullable=False
-        ),
-        sa.Column(
-            "required_actions",
-            sa.JSON(),
-            server_default=sa.text("'[]'::json"),
-            nullable=False
-        ),
-        sa.Column(
-            "blocking_conditions",
-            sa.JSON(),
-            server_default=sa.text("'[]'::json"),
-            nullable=False
-        ),
-        sa.Column("kanban_column", sa.String(), nullable=False),
-        sa.Column("order_index", sa.Integer(), nullable=False),
-        sa.Column(
-            "auto_advance",
-            sa.Boolean(),
-            server_default=sa.text("false"),
-            nullable=False
-        ),
-        sa.Column(
-            "created_at",
-            sa.DateTime(timezone=True),
-            server_default=sa.text("now()")
-        ),
-    )
-
-    op.create_table(
-        "case_workflow_instances",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column(
-            "case_id",
-            postgresql.UUID(as_uuid=True),
-            sa.ForeignKey("cases.id"),
-            nullable=False,
-            unique=True
-        ),
-        sa.Column(
-            "template_id",
-            postgresql.UUID(as_uuid=True),
-            sa.ForeignKey("workflow_templates.id"),
-            nullable=False
-        ),
-        sa.Column("current_step_key", sa.String(), nullable=False),
-        sa.Column(
-            "started_at",
-            sa.DateTime(timezone=True),
-            server_default=sa.text("now()")
-        ),
-        sa.Column("completed_at", sa.DateTime(timezone=True)),
-    )
-
-    op.create_table(
-        "case_workflow_progress",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column(
-            "instance_id",
-            postgresql.UUID(as_uuid=True),
-            sa.ForeignKey("case_workflow_instances.id"),
-            nullable=False
-        ),
-        sa.Column("step_key", sa.String(), nullable=False),
-        sa.Column(
-            "status",
-            workflow_step_status,
-            server_default="pending",
-            nullable=False
-        ),
-        sa.Column("started_at", sa.DateTime(timezone=True)),
-        sa.Column("completed_at", sa.DateTime(timezone=True)),
-        sa.Column("block_reason", sa.String()),
+        "users",
+        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
+        sa.Column("email", sa.String(), nullable=False, unique=True),
+        sa.Column("hashed_password", sa.String(), nullable=False),
+        sa.Column("role", user_role_enum, nullable=True),
+        sa.Column("full_name", sa.String()),
+        sa.Column("created_at", sa.DateTime(timezone=True),
+                  server_default=sa.text("now()")),
     )
 
     # --------------------------------------------------
-    # ADDITIONAL COLUMNS
+    # PROPERTIES
     # --------------------------------------------------
 
-    op.add_column(
+    op.create_table(
+        "properties",
+        sa.Column("id", postgresql.UUID(as_uuid=True),
+                  primary_key=True, nullable=False),
+        sa.Column("external_id", sa.String(), nullable=False, unique=True),
+        sa.Column("address", sa.String(), nullable=False),
+        sa.Column("city", sa.String(), nullable=False),
+        sa.Column("state", sa.String(), nullable=False),
+        sa.Column("zip", sa.String(), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True),
+                  server_default=sa.text("now()")),
+    )
+
+    # --------------------------------------------------
+    # CASES
+    # --------------------------------------------------
+
+    op.create_table(
+        "cases",
+        sa.Column("id", postgresql.UUID(as_uuid=True),
+                  primary_key=True, nullable=False),
+        sa.Column("status", case_status_enum, nullable=False),
+        sa.Column("created_by", postgresql.UUID(as_uuid=True),
+                  sa.ForeignKey("users.id"), nullable=False),
+        sa.Column("property_id", postgresql.UUID(as_uuid=True),
+                  sa.ForeignKey("properties.id")),
+        sa.Column("program_key", sa.String()),
+        sa.Column("case_type", sa.String()),
+        sa.Column("meta", sa.JSON()),
+        sa.Column("created_at", sa.DateTime(timezone=True),
+                  server_default=sa.text("now()")),
+    )
+
+    # --------------------------------------------------
+    # LEADS
+    # --------------------------------------------------
+
+    op.create_table(
+        "leads",
+        sa.Column("id", postgresql.UUID(as_uuid=True),
+                  primary_key=True, nullable=False),
+        sa.Column("lead_id", sa.String(), nullable=False, unique=True),
+        sa.Column("address", sa.String(), nullable=False),
+        sa.Column("city", sa.String()),
+        sa.Column("state", sa.String()),
+        sa.Column("zip", sa.String()),
+        sa.Column("created_at", sa.DateTime(timezone=True),
+                  server_default=sa.text("now()")),
+    )
+
+    # --------------------------------------------------
+    # AUCTION IMPORTS
+    # --------------------------------------------------
+
+    op.create_table(
         "auction_imports",
-        sa.Column("file_type", sa.String())
+        sa.Column("id", postgresql.UUID(as_uuid=True),
+                  primary_key=True, nullable=False),
+        sa.Column("filename", sa.String(), nullable=False),
+        sa.Column("content_type", sa.String()),
+        sa.Column("file_bytes", sa.LargeBinary(), nullable=False),
+        sa.Column("status", sa.String(), nullable=False),
+        sa.Column("records_created", sa.Integer(), nullable=False),
+        sa.Column("error_message", sa.String()),
+        sa.Column("uploaded_at", sa.DateTime(timezone=True),
+                  server_default=sa.text("now()")),
     )
 
-    op.add_column("leads", sa.Column("county", sa.String()))
-    op.add_column("leads", sa.Column("trustee", sa.String()))
-    op.add_column("leads", sa.Column("mortgagor", sa.String()))
-    op.add_column("leads", sa.Column("mortgagee", sa.String()))
-    op.add_column("leads", sa.Column("auction_date", sa.DateTime(timezone=True)))
-    op.add_column("leads", sa.Column("case_number", sa.String()))
-    op.add_column("leads", sa.Column("opening_bid", sa.Float()))
 
+# --------------------------------------------------
+# DOWNGRADE
+# --------------------------------------------------
 
 def downgrade():
 
-    op.drop_table("case_workflow_progress")
-    op.drop_table("case_workflow_instances")
-    op.drop_table("workflow_steps")
-    op.drop_table("workflow_templates")
+    op.drop_table("auction_imports")
+    op.drop_table("leads")
+    op.drop_table("cases")
+    op.drop_table("properties")
+    op.drop_table("users")
 
-    workflow_step_status.drop(op.get_bind())
-    workflow_responsible_role.drop(op.get_bind())
+    case_status_enum.drop(op.get_bind(), checkfirst=True)
+    user_role_enum.drop(op.get_bind(), checkfirst=True)
