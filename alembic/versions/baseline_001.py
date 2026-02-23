@@ -21,7 +21,7 @@ depends_on = None
 # CORE ENUMS (NON-WORKFLOW ONLY)
 # --------------------------------------------------
 
-case_status_enum = sa.Enum(
+case_status_enum = postgresql.ENUM(
     "intake_submitted",
     "intake_incomplete",
     "under_review",
@@ -30,9 +30,10 @@ case_status_enum = sa.Enum(
     "case_closed_other_outcome",
     "auction_intake",
     name="casestatus",
+    create_type=False,
 )
 
-user_role_enum = sa.Enum(
+user_role_enum = postgresql.ENUM(
     "case_worker",
     "referral_coordinator",
     "admin",
@@ -40,6 +41,7 @@ user_role_enum = sa.Enum(
     "ai_policy_chair",
     "partner_org",
     name="userrole",
+    create_type=False,
 )
 
 

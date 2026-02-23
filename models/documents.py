@@ -1,5 +1,5 @@
-from sqlalchemy import Column, DateTime, ForeignKey, Enum, JSON, String
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Column, DateTime, ForeignKey, JSON, String
+from sqlalchemy.dialects.postgresql import UUID, ENUM
 from sqlalchemy.sql import func
 import uuid
 from models.enums import DocumentType
@@ -12,7 +12,7 @@ class Document(Base):
     case_id = Column(UUID(as_uuid=True), ForeignKey("cases.id"), nullable=False)
     uploaded_by = Column(UUID(as_uuid=True), nullable=False)
     doc_type = Column(
-        Enum(
+        ENUM(
             DocumentType,
             name="documenttype",
             create_type=False
