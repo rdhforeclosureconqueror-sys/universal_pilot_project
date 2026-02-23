@@ -20,28 +20,31 @@ depends_on = None
 # ENUMS
 # -------------------------------------------------
 
-workflow_responsible_role = sa.Enum(
+workflow_responsible_role = postgresql.ENUM(
     "operator",
     "occupant",
     "system",
     "lender",
     name="workflowresponsiblerole",
+    create_type=False,
 )
 
-workflow_step_status = sa.Enum(
+workflow_step_status = postgresql.ENUM(
     "pending",
     "active",
     "blocked",
     "complete",
     name="workflowstepstatus",
+    create_type=False,
 )
 
-workflow_override_category = sa.Enum(
+workflow_override_category = postgresql.ENUM(
     "data_correction",
     "legal_exception",
     "executive_directive",
     "system_recovery",
     name="workflowoverridecategory",
+    create_type=False,
 )
 
 

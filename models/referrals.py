@@ -1,5 +1,5 @@
-from sqlalchemy import Column, DateTime, ForeignKey, Enum, JSON
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Column, DateTime, ForeignKey, JSON
+from sqlalchemy.dialects.postgresql import UUID, ENUM
 from sqlalchemy.sql import func
 import uuid
 from models.enums import ReferralStatus
@@ -12,7 +12,7 @@ class Referral(Base):
     case_id = Column(UUID(as_uuid=True), ForeignKey("cases.id"), nullable=False)
     partner_id = Column(UUID(as_uuid=True), ForeignKey("partners.id"), nullable=False)
     status = Column(
-        Enum(
+        ENUM(
             ReferralStatus,
             name="referralstatus",
             create_type=False

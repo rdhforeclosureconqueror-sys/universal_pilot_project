@@ -1,8 +1,8 @@
 import enum
 import uuid
 
-from sqlalchemy import Column, String, DateTime, ForeignKey, Integer, Boolean, Enum, JSON
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Column, String, DateTime, ForeignKey, Integer, Boolean, JSON
+from sqlalchemy.dialects.postgresql import UUID, ENUM
 from sqlalchemy.sql import func
 
 from .base import Base
@@ -64,7 +64,7 @@ class WorkflowStep(Base):
 
     # 🔥 FIXED ENUM
     responsible_role = Column(
-        Enum(
+        ENUM(
             WorkflowResponsibleRole,
             name="workflowresponsiblerole",
             create_type=False  # 🚫 prevent SQLAlchemy from auto-creating
@@ -127,7 +127,7 @@ class CaseWorkflowProgress(Base):
 
     # 🔥 FIXED ENUM
     status = Column(
-        Enum(
+        ENUM(
             WorkflowStepStatus,
             name="workflowstepstatus",
             create_type=False  # 🚫 prevent SQLAlchemy from auto-creating
@@ -165,7 +165,7 @@ class WorkflowOverride(Base):
 
     # 🔥 FIXED ENUM
     reason_category = Column(
-        Enum(
+        ENUM(
             WorkflowOverrideCategory,
             name="workflowoverridecategory",
             create_type=False  # 🚫 prevent SQLAlchemy from auto-creating

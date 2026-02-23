@@ -1,5 +1,5 @@
-from sqlalchemy import Column, String, DateTime, ForeignKey, Enum, JSON, UniqueConstraint
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Column, String, DateTime, ForeignKey, JSON, UniqueConstraint
+from sqlalchemy.dialects.postgresql import UUID, ENUM
 from sqlalchemy.sql import func
 import uuid
 from models.enums import CaseStatus
@@ -14,7 +14,7 @@ class Case(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     status = Column(
-        Enum(
+        ENUM(
             CaseStatus,
             name="casestatus",
             create_type=False
