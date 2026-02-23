@@ -11,7 +11,14 @@ class Document(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     case_id = Column(UUID(as_uuid=True), ForeignKey("cases.id"), nullable=False)
     uploaded_by = Column(UUID(as_uuid=True), nullable=False)
-    doc_type = Column(Enum(DocumentType), nullable=False)
+    doc_type = Column(
+        Enum(
+            DocumentType,
+            name="documenttype",
+            create_type=False
+        ),
+        nullable=False
+    )
     meta = Column(JSON, nullable=True)
     uploaded_at = Column(DateTime(timezone=True), server_default=func.now())
     file_url = Column(String, nullable=True)
