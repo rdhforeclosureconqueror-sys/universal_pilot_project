@@ -1,10 +1,27 @@
+from _future_ import annotations
+
 import enum
-from sqlalchemy import Boolean, Column, Date, DateTime, ForeignKey, Integer, Numeric, Text
+import uuid
+
+from sqlalchemy import (
+    Boolean,
+    Column,
+    Date,
+    DateTime,
+    ForeignKey,
+    Integer,
+    Numeric,
+    Text,
+)
 from sqlalchemy.dialects.postgresql import ENUM, JSONB, UUID
 from sqlalchemy.sql import func
 
 from .base import Base
 
+
+# ============================================================
+# ENUM DEFINITIONS
+# ============================================================
 
 class ApplicationStatus(enum.Enum):
     started = "started"
@@ -43,74 +60,170 @@ class CheckinType(enum.Enum):
     support_request = "support_request"
 
 
-class Application(Base):
-    __tablename__ = "applications"
+# ============================================================
+# APPLICATION
+# ============================================================
 
-    id = Column(UUID(as_uuid=True), primary_key=True)
+class Application(Base):
+    _tablename_ = "applications"
+
+    id = Column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+        nullable=False,
+    )
+
     email = Column(Text, nullable=False)
     full_name = Column(Text, nullable=True)
     phone = Column(Text, nullable=True)
+
     program_key = Column(Text, nullable=False, index=True)
+
     status = Column(
         ENUM(ApplicationStatus, name="applicationstatus", create_type=False),
         nullable=False,
     )
+
     answers_json = Column(JSONB, nullable=False)
-    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    created_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+
     submitted_at = Column(DateTime(timezone=True), nullable=True)
 
 
-class Membership(Base):
-    __tablename__ = "memberships"
+# ============================================================
+# MEMBERSHIP
+# ============================================================
 
-    id = Column(UUID(as_uuid=True), primary_key=True)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+class Membership(Base):
+    _tablename_ = "memberships"
+
+    id = Column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+        nullable=False,
+    )
+
+    user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id"),
+        nullable=False,
+        index=True,
+    )
+
     program_key = Column(Text, nullable=False, index=True)
+
     term_start = Column(Date, nullable=False)
     term_end = Column(Date, nullable=False)
+
     annual_price_cents = Column(Integer, nullable=False)
     installment_cents = Column(Integer, nullable=False)
+
     status = Column(
         ENUM(MembershipStatus, name="membershipstatus", create_type=False),
         nullable=False,
         server_default="active",
     )
-    good_standing = Column(Boolean, nullable=False, server_default="true")
-    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
+    good_standing = Column(
+        Boolean,
+        nullable=False,
+        server_default="true",
+    )
+
+    created_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+
+
+# ============================================================
+# MEMBERSHIP INSTALLMENTS
+# ============================================================
 
 class MembershipInstallment(Base):
-    __tablename__ = "membership_installments"
+    _tablename_ = "membership_installments"
 
-    id = Column(UUID(as_uuid=True), primary_key=True)
+    id = Column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+        nullable=False,
+    )
+
     membership_id = Column(
         UUID(as_uuid=True),
         ForeignKey("memberships.id"),
         nullable=False,
         index=True,
     )
+
     due_date = Column(Date, nullable=False, index=True)
     amount_cents = Column(Integer, nullable=False)
+
     status = Column(
         ENUM(InstallmentStatus, name="installmentstatus", create_type=False),
         nullable=False,
         server_default="due",
     )
+
     paid_at = Column(DateTime(timezone=True), nullable=True)
     notes = Column(Text, nullable=True)
-    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
+    created_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+
+
+# ============================================================
+# STABILITY ASSESSMENT
+# ============================================================
 
 class StabilityAssessment(Base):
-    __tablename__ = "stability_assessments"
+    _tablename_ = "stability_assessments"
 
-    id = Column(UUID(as_uuid=True), primary_key=True)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
-    property_id = Column(UUID(as_uuid=True), ForeignKey("properties.id"), nullable=True)
+    id = Column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+        nullable=False,
+    )
+
+    user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id"),
+        nullable=False,
+        index=True,
+    )
+
+    property_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("properties.id"),
+        nullable=True,
+    )
+
     program_key = Column(Text, nullable=False, index=True)
+
     equity_estimate = Column(Numeric(12, 2), nullable=True)
     equity_health_band = Column(Text, nullable=True)
+
     stability_score = Column(Integer, nullable=False)
     risk_level = Column(Text, nullable=True)
+
     breakdown_json = Column(JSONB, nullable=False)
-    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), index=True)
+
+    created_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        index=True,
+    )
