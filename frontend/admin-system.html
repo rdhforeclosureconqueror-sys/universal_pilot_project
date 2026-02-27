@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>System Verification</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 24px; background: #0b1020; color: #e6ecff; }
+    h1 { margin-bottom: 8px; }
+    .muted { color: #93a4d1; }
+    table { border-collapse: collapse; width: 100%; margin-top: 16px; background: #141b34; }
+    th, td { border: 1px solid #2a355f; padding: 10px; text-align: left; }
+    th { background: #1a2447; }
+    button { background: #4a6cf7; color: white; border: 0; padding: 8px 12px; border-radius: 6px; cursor: pointer; }
+    pre { margin-top: 16px; background: #141b34; border: 1px solid #2a355f; padding: 12px; overflow: auto; }
+    .ok { color: #64d27c; }
+    .warn { color: #ffca68; }
+  </style>
+</head>
+<body>
+  <h1>System Verification</h1>
+  <div class="muted" id="env">Environment: loading...</div>
+  <table>
+    <thead>
+      <tr>
+        <th>Phase</th>
+        <th>Status</th>
+        <th>Verified At</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody id="phase-rows"></tbody>
+  </table>
+
+  <h3>Verification Result</h3>
+  <pre id="result">Run a phase verification to see details.</pre>
+
+  <script>
+    const rowsEl = document.getElementById('phase-rows');
+    const resultEl = document.getElementById('result');
+    const envEl = document.getElementById('env');
+
+    async function loadPhases() {
+      const res = await fetch('/admin/system/phases');
+      const phases = await res.json();
+      rowsEl.innerHTML = '';
+
+      const environment = phases?.[0]?.environment || 'development';
+      envEl.textContent = `Environment: ${environment}`;
+
+      phases.forEach((phase) => {
+        const tr = document.createElement('tr');
+        const statusClass = phase.status === 'verified' ? 'ok' : 'warn';
+        tr.innerHTML = `
+          <td>${phase.phase_key}</td>
+          <td class="${statusClass}">${phase.status}</td>
+          <td>${phase.verified_at || '—'}</td>
+          <td><button data-phase="${phase.phase_key}">Run Verification</button></td>
+        `;
+        rowsEl.appendChild(tr);
+      });
+
+      rowsEl.querySelectorAll('button').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          btn.disabled = true;
+          const phaseKey = btn.dataset.phase;
+          try {
+            const runRes = await fetch(`/admin/system/verify/${phaseKey}`, { method: 'POST' });
+            const payload = await runRes.json();
+            resultEl.textContent = JSON.stringify(payload, null, 2);
+            await loadPhases();
+          } catch (err) {
+            resultEl.textContent = JSON.stringify({ error: String(err) }, null, 2);
+          } finally {
+            btn.disabled = false;
+          }
+        });
+      });
+    }
+
+    loadPhases();
+  </script>
+</body>
+</html>
