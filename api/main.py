@@ -22,6 +22,7 @@ from api.routes import (
     leads,     # ✅ Newly added auction import route
     workflow,
     partner_api,
+    public_apply,
 )
 
 app = FastAPI()
@@ -68,3 +69,4 @@ app.include_router(auction_imports.router)  # ✅ Needed for /auction-imports/*
 app.include_router(workflow.router)
 
 app.include_router(partner_api.router)
+app.include_router(public_apply.router)
