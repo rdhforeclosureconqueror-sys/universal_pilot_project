@@ -1,4 +1,4 @@
-from _future_ import annotations
+from __future__ import annotations
 
 import enum
 import uuid
@@ -65,7 +65,7 @@ class CheckinType(enum.Enum):
 # ============================================================
 
 class Application(Base):
-    _tablename_ = "applications"
+    __tablename__ = "applications"
 
     id = Column(
         UUID(as_uuid=True),
@@ -101,7 +101,7 @@ class Application(Base):
 # ============================================================
 
 class Membership(Base):
-    _tablename_ = "memberships"
+    __tablename__ = "memberships"
 
     id = Column(
         UUID(as_uuid=True),
@@ -149,7 +149,7 @@ class Membership(Base):
 # ============================================================
 
 class MembershipInstallment(Base):
-    _tablename_ = "membership_installments"
+    __tablename__ = "membership_installments"
 
     id = Column(
         UUID(as_uuid=True),
@@ -189,7 +189,7 @@ class MembershipInstallment(Base):
 # ============================================================
 
 class StabilityAssessment(Base):
-    _tablename_ = "stability_assessments"
+    __tablename__ = "stability_assessments"
 
     id = Column(
         UUID(as_uuid=True),
