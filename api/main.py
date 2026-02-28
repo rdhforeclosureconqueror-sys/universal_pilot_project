@@ -1,11 +1,10 @@
-from pathlib import Path
+////////from pathlib import Path
 import os
 
 from fastapi import FastAPI
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
-
-from app.api.routes import member_dashboard
+from app.api.routes import member_dashboard, member_payments
 
 # ✅ Import all route modules
 from api.routes import (
@@ -75,8 +74,9 @@ app.include_router(partner_api.router)
 app.include_router(public_apply.router)
 app.include_router(system_admin.router)
 app.include_router(member_dashboard.router)
-
+app.include_router(member_payments.router)
 
 @app.get("/admin/system")
 def admin_system_page():
     return FileResponse(frontend_dir / "admin-system.html")
+  
