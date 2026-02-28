@@ -9,7 +9,7 @@ if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
 from db.session import SessionLocal
-from models.policy_versions import PolicyVersion
+from app.models.policy_versions import PolicyVersion
 from policy.modules.foreclosure_policy_module import FORECLOSURE_POLICY
 
 

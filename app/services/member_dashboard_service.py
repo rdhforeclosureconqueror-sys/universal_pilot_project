@@ -4,9 +4,9 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.schemas.member_dashboard import InstallmentDTO, MemberDashboardDTO, WorkflowStepDTO
-from models.cases import Case
-from models.member_layer import InstallmentStatus, Membership, MembershipStatus, MembershipInstallment, StabilityAssessment
-from models.workflow import CaseWorkflowInstance, CaseWorkflowProgress, WorkflowStep, WorkflowStepStatus
+from app.models.cases import Case
+from app.models.member_layer import InstallmentStatus, Membership, MembershipStatus, MembershipInstallment, StabilityAssessment
+from app.models.workflow import CaseWorkflowInstance, CaseWorkflowProgress, WorkflowStep, WorkflowStepStatus
 
 
 def get_member_dashboard(db: Session, user_id: UUID) -> MemberDashboardDTO:

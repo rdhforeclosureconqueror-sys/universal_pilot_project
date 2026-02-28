@@ -9,7 +9,7 @@ from auth.authorization import PolicyAuthorizer
 from auth.dependencies import get_current_user
 from audit.logger import log_audit
 from policy.loader import PolicyEngine
-from models.cases import Case
+from app.models.cases import Case
 import hashlib
 
 router = APIRouter(prefix="/ai", tags=["Diamond AI"])

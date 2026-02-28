@@ -2,7 +2,7 @@ import json
 from sqlalchemy.orm import Session
 from uuid import uuid4
 from datetime import datetime
-from models.policy_versions import PolicyVersion
+from app.models.policy_versions import PolicyVersion
 from db.session import SessionLocal
 
 def load_seed_policy():

@@ -2,7 +2,7 @@ from sqlalchemy import Column, DateTime, ForeignKey, JSON, String
 from sqlalchemy.dialects.postgresql import UUID, ENUM
 from sqlalchemy.sql import func
 import uuid
-from models.enums import DocumentType
+from app.models.enums import DocumentType
 from .base import Base
 
 class Document(Base):

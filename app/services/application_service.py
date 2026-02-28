@@ -2,10 +2,10 @@ from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
-from models.member_layer import Application, ApplicationStatus
-from schemas.application import ApplicationCreate
-from services.activation_service import activate_member
-from services.qualification_service import qualifies
+from app.models.member_layer import Application, ApplicationStatus
+from app.schemas.application import ApplicationCreate
+from app.services.activation_service import activate_member
+from app.services.qualification_service import qualifies
 
 
 def submit_application(db: Session, payload: ApplicationCreate) -> Application:

@@ -32,4 +32,4 @@ def get_db():
 
 
 # register workflow sync listeners
-import models.workflow_events  # noqa: F401
+import app.models.workflow_events  # noqa: F401

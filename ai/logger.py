@@ -1,4 +1,4 @@
-from models.ai_activity_logs import AIActivityLog
+from app.models.ai_activity_logs import AIActivityLog
 from uuid import uuid4
 from datetime import datetime
 

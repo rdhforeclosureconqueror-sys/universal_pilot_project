@@ -2,8 +2,8 @@ from datetime import date, timedelta
 
 from sqlalchemy.orm import Session
 
-from models.member_layer import Membership, MembershipInstallment, MembershipStatus, InstallmentStatus
-from models.users import User
+from app.models.member_layer import Membership, MembershipInstallment, MembershipStatus, InstallmentStatus
+from app.models.users import User
 
 
 def create_membership_with_installments(db: Session, user: User, program_key: str) -> Membership:

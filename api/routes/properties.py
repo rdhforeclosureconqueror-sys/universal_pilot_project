@@ -2,8 +2,8 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from db.session import get_db
-from models.properties import Property
-from models.cases import Case
+from app.models.properties import Property
+from app.models.cases import Case
 
 router = APIRouter(prefix="/properties", tags=["Properties"])
 

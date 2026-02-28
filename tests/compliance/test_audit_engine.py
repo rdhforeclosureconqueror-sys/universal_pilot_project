@@ -1,7 +1,7 @@
 from uuid import uuid4
 
 from audit.logger import log_audit
-from models.audit_logs import AuditLog
+from app.models.audit_logs import AuditLog
 
 
 def test_log_audit_writes_expected_fields(db_session):

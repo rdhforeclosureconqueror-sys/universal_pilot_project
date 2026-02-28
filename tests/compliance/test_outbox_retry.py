@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import uuid4
 
-from models.outbox_queue import OutboxQueue
+from app.models.outbox_queue import OutboxQueue
 from workers.tasks.referral_delivery import process_referral_outbox
 
 

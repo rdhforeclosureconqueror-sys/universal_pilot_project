@@ -1,12 +1,12 @@
 from sqlalchemy.orm import Session
 
-from models.cases import Case
-from models.enums import CaseStatus
-from models.member_layer import Application, Membership, MembershipStatus
-from models.users import User
-from services.membership_service import create_membership_with_installments
-from services.stability_service import create_baseline_stability
-from services.workflow_service import attach_workflow_template
+from app.models.cases import Case
+from app.models.enums import CaseStatus
+from app.models.member_layer import Application, Membership, MembershipStatus
+from app.models.users import User
+from app.services.membership_service import create_membership_with_installments
+from app.services.stability_service import create_baseline_stability
+from app.services.workflow_service import attach_workflow_template
 
 
 def activate_member(db: Session, application: Application) -> Membership:

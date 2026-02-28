@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from db.session import SessionLocal
 from ingestion.dallas.public_records import fetch_public_records
-from models.botops import BotCommand, BotReport, BotSetting, Lead
+from app.models.botops import BotCommand, BotReport, BotSetting, Lead
 from workers.celery_worker import celery_app
 
 logger = logging.getLogger(__name__)

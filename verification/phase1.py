@@ -2,17 +2,17 @@ from uuid import uuid4
 
 from sqlalchemy.orm import Session
 
-from models.cases import Case
-from models.member_layer import Application, Membership, MembershipInstallment, StabilityAssessment
-from models.users import User
-from models.workflow import (
+from app.models.cases import Case
+from app.models.member_layer import Application, Membership, MembershipInstallment, StabilityAssessment
+from app.models.users import User
+from app.models.workflow import (
     CaseWorkflowInstance,
     WorkflowResponsibleRole,
     WorkflowStep,
     WorkflowTemplate,
 )
-from schemas.application import ApplicationCreate
-from services.application_service import submit_application
+from app.schemas.application import ApplicationCreate
+from app.services.application_service import submit_application
 
 
 class Phase1Verifier:

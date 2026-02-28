@@ -12,8 +12,8 @@ if BASE_DIR not in sys.path:
 from api.main import app
 from auth.auth_handler import hash_password
 from db.session import SessionLocal, get_db
-from models.policy_versions import PolicyVersion
-from models.users import User, UserRole
+from app.models.policy_versions import PolicyVersion
+from app.models.users import User, UserRole
 
 
 @pytest.fixture(scope="function")

@@ -4,8 +4,8 @@ from sqlalchemy.orm import Session
 from auth.authorization import PolicyAuthorizer
 from auth.dependencies import get_current_user
 from db.session import get_db
-from models.training_quiz_attempts import TrainingQuizAttempt
-from models.cases import Case
+from app.models.training_quiz_attempts import TrainingQuizAttempt
+from app.models.cases import Case
 from audit.logger import log_audit
 from policy.loader import PolicyEngine
 from uuid import uuid4

@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.services.payment_service import mark_installment_paid
 from auth.dependencies import get_current_user
 from db.session import get_db
-from models.users import User
+from app.models.users import User
 
 
 router = APIRouter(tags=["member"])

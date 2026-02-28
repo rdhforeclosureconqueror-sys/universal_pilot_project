@@ -2,7 +2,7 @@ from sqlalchemy import Column, DateTime, ForeignKey, JSON
 from sqlalchemy.dialects.postgresql import UUID, ENUM
 from sqlalchemy.sql import func
 import uuid
-from models.enums import ReferralStatus
+from app.models.enums import ReferralStatus
 from .base import Base
 
 class Referral(Base):

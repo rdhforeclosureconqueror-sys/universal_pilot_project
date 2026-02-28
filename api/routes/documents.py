@@ -6,14 +6,14 @@ from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from audit.logger import log_audit
-from models.documents import Document, DocumentType
-from models.audit_logs import AuditLog
+from app.models.documents import Document, DocumentType
+from app.models.audit_logs import AuditLog
 from db.session import get_db
 from auth.authorization import PolicyAuthorizer
 from auth.dependencies import get_current_user
 from db.session import get_db
-from models.documents import Document
-from models.enums import DocumentType
+from app.models.documents import Document
+from app.models.enums import DocumentType
 
 router = APIRouter(prefix="/documents", tags=["Documents"])
 

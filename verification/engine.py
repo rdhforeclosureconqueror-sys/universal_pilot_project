@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
-from models.system_verification import PhaseVerificationRun, SystemPhase
+from app.models.system_verification import PhaseVerificationRun, SystemPhase
 from verification.phase1 import Phase1Verifier
 
 

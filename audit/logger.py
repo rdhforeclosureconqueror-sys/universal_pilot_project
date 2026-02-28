@@ -4,7 +4,7 @@ from uuid import uuid4
 
 from sqlalchemy.orm import Session
 
-from models.audit_logs import AuditLog
+from app.models.audit_logs import AuditLog
 
 
 def log_audit(

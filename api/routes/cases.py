@@ -8,11 +8,11 @@ from sqlalchemy.orm import Session
 
 from audit.logger import log_audit
 from db.session import get_db
-from models.cases import Case
-from models.enums import CaseStatus
-from models.policy_versions import PolicyVersion
-from schemas.case import CaseCreateRequest
-from services.workflow_engine import initialize_case_workflow, sync_case_workflow
+from app.models.cases import Case
+from app.models.enums import CaseStatus
+from app.models.policy_versions import PolicyVersion
+from app.schemas.case import CaseCreateRequest
+from app.services.workflow_engine import initialize_case_workflow, sync_case_workflow
 
 router = APIRouter()
 

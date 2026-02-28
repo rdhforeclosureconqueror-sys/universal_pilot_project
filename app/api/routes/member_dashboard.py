@@ -5,7 +5,7 @@ from app.schemas.member_dashboard import MemberDashboardResponse
 from app.services.member_dashboard_service import get_member_dashboard
 from auth.dependencies import get_current_user
 from db.session import get_db
-from models.users import User
+from app.models.users import User
 
 
 router = APIRouter(tags=["member"])
