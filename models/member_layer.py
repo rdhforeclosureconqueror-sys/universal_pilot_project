@@ -13,7 +13,7 @@ from sqlalchemy import (
     Numeric,
     Text,
 )
-from sqlalchemy.dialects.postgresql
+from sqlalchemy.dialects.postgresql import UUID, JSONB, ENUM
 from sqlalchemy.sql import func
 
 from .base import Base
@@ -84,7 +84,7 @@ class Application(Base):
         ENUM(ApplicationStatus, name="applicationstatus", create_type=False),
         nullable=False,
     )
-    
+
     answers_json = Column(JSONB, nullable=False)
 
     created_at = Column(
@@ -97,18 +97,6 @@ class Application(Base):
         DateTime(timezone=True),
         nullable=True,
     )
-answers_json = Column(JSONB, nullable=False)
-
-created_at = Column(
-    DateTime(timezone=True),
-    nullable=False,
-    server_default=func.now(),
-)
-
-submitted_at = Column(
-    DateTime(timezone=True),
-    nullable=True,
-)
 
 
 # ============================================================
@@ -116,7 +104,7 @@ submitted_at = Column(
 # ============================================================
 
 class Membership(Base):
-    _tablename_ = "memberships"
+    __tablename__ = "memberships"
 
     id = Column(
         UUID(as_uuid=True),
@@ -140,23 +128,6 @@ class Membership(Base):
     annual_price_cents = Column(Integer, nullable=False)
     installment_cents = Column(Integer, nullable=False)
 
-    status = Column(
-        ENUM(MembershipStatus, name="membershipstatus", create_type=False),
-        nullable=False,
-        server_default="active",
-    )
-
-    good_standing = Column(
-        Boolean,
-        nullable=False,
-        server_default="true",
-    )
-
-    created_at = Column(
-        DateTime(timezone=True),
-        nullable=False,
-        server_default=func.now(),
-    )
     status = Column(
         ENUM(MembershipStatus, name="membershipstatus", create_type=False),
         nullable=False,
@@ -205,14 +176,15 @@ class MembershipInstallment(Base):
         nullable=False,
         server_default="due",
     )
-paid_at = Column(DateTime(timezone=True), nullable=True)
-notes = Column(Text, nullable=True)
 
-created_at = Column(
-    DateTime(timezone=True),
-    nullable=False,
-    server_default=func.now(),
-)
+    paid_at = Column(DateTime(timezone=True), nullable=True)
+    notes = Column(Text, nullable=True)
+
+    created_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
 
 
 # ============================================================
@@ -220,7 +192,7 @@ created_at = Column(
 # ============================================================
 
 class StabilityAssessment(Base):
-    _tablename_ = "stability_assessments"
+    __tablename__ = "stability_assessments"
 
     id = Column(
         UUID(as_uuid=True),
