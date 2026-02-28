@@ -1,5 +1,5 @@
 from db.session import SessionLocal
-from models.policy_versions import PolicyVersion
+from app.models.policy_versions import PolicyVersion
 
 
 def run():

@@ -5,7 +5,7 @@ import re
 import pdfplumber
 from sqlalchemy.orm import Session
 
-from models.ingestion_metrics import IngestionMetric
+from app.models.ingestion_metrics import IngestionMetric
 from ingestion.pdf import extract_text_from_pdf
 
 from .dallas_parser import parse_dallas_row

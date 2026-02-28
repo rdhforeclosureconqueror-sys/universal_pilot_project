@@ -13,7 +13,7 @@ load_dotenv()
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # ✅ Import your base and models
-from models.base import Base
+from app.models.base import Base
 import models  # ensures all models are registered with Base.metadata
 
 # ✅ Alembic Config object

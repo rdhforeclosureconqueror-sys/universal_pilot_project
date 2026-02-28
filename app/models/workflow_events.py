@@ -1,9 +1,9 @@
 from sqlalchemy import event
 from sqlalchemy.orm import Session
 
-from models.audit_logs import AuditLog
-from models.documents import Document
-from services.workflow_engine import sync_case_workflow
+from app.models.audit_logs import AuditLog
+from app.models.documents import Document
+from app.services.workflow_engine import sync_case_workflow
 
 
 def _sync_case_on_event(connection, case_id):

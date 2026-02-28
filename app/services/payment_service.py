@@ -5,7 +5,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.services.stability_service import recalculate_stability
-from models.member_layer import InstallmentStatus, Membership, MembershipInstallment
+from app.models.member_layer import InstallmentStatus, Membership, MembershipInstallment
 
 
 def mark_installment_paid(db: Session, installment_id: UUID) -> MembershipInstallment:

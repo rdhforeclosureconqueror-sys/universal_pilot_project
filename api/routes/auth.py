@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from auth.auth_handler import verify_password, create_access_token
 from auth.authorization import PolicyAuthorizer
 from auth.dependencies import get_current_user
-from models.users import User
+from app.models.users import User
 from db.session import get_db
 
 from pydantic import BaseModel

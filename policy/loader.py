@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from models.policy_versions import PolicyVersion
+from app.models.policy_versions import PolicyVersion
 from fastapi import HTTPException
 
 class PolicyEngine:

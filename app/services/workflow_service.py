@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 
-from models.cases import Case
-from models.workflow import CaseWorkflowInstance, CaseWorkflowProgress, WorkflowStep, WorkflowTemplate, WorkflowStepStatus
+from app.models.cases import Case
+from app.models.workflow import CaseWorkflowInstance, CaseWorkflowProgress, WorkflowStep, WorkflowTemplate, WorkflowStepStatus
 
 
 def attach_workflow_template(db: Session, case: Case, program_key: str) -> CaseWorkflowInstance:
