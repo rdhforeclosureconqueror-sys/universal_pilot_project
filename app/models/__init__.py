@@ -46,6 +46,8 @@ from .member_layer import (
     MembershipStatus,
     MembershipInstallment,
     InstallmentStatus,
+    ContributionCredit,
+    MemberCheckin,
     StabilityAssessment,
     CreditType,
     CheckinType,
