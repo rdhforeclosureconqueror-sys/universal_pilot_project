@@ -1,27 +1,11 @@
 from __future__ import annotations
-
 import enum
-import uuid
-
-from sqlalchemy import (
-    Boolean,
-    Column,
-    Date,
-    DateTime,
-    ForeignKey,
-    Integer,
-    Numeric,
-    Text,
-)
-from sqlalchemy.dialects.postgresql import UUID, JSONB, ENUM
+from sqlalchemy import Boolean, Column, Date, DateTime, ForeignKey, Integer, Numeric, Text
+from sqlalchemy.dialects.postgresql import ENUM, JSONB, UUID
 from sqlalchemy.sql import func
 
 from .base import Base
 
-
-# ============================================================
-# ENUM DEFINITIONS
-# ============================================================
 
 class ApplicationStatus(enum.Enum):
     started = "started"
@@ -60,9 +44,6 @@ class CheckinType(enum.Enum):
     support_request = "support_request"
 
 
-# ============================================================
-# APPLICATION
-# ============================================================
 
 class Application(Base):
     __tablename__ = "applications"
@@ -79,6 +60,7 @@ class Application(Base):
     phone = Column(Text, nullable=True)
 
     program_key = Column(Text, nullable=False, index=True)
+
 
     status = Column(
         ENUM(ApplicationStatus, name="applicationstatus", create_type=False),
@@ -99,12 +81,9 @@ class Application(Base):
     )
 
 
-# ============================================================
-# MEMBERSHIP
-# ============================================================
-
 class Membership(Base):
     __tablename__ = "memberships"
+
 
     id = Column(
         UUID(as_uuid=True),
@@ -128,11 +107,13 @@ class Membership(Base):
     annual_price_cents = Column(Integer, nullable=False)
     installment_cents = Column(Integer, nullable=False)
 
+
     status = Column(
         ENUM(MembershipStatus, name="membershipstatus", create_type=False),
         nullable=False,
         server_default="active",
     )
+
 
     good_standing = Column(
         Boolean,
@@ -147,12 +128,10 @@ class Membership(Base):
     )
 
 
-# ============================================================
-# MEMBERSHIP INSTALLMENTS
-# ============================================================
 
 class MembershipInstallment(Base):
     __tablename__ = "membership_installments"
+
 
     id = Column(
         UUID(as_uuid=True),
@@ -161,12 +140,14 @@ class MembershipInstallment(Base):
         nullable=False,
     )
 
+
     membership_id = Column(
         UUID(as_uuid=True),
         ForeignKey("memberships.id"),
         nullable=False,
         index=True,
     )
+
 
     due_date = Column(Date, nullable=False, index=True)
     amount_cents = Column(Integer, nullable=False)
@@ -176,6 +157,7 @@ class MembershipInstallment(Base):
         nullable=False,
         server_default="due",
     )
+
 
     paid_at = Column(DateTime(timezone=True), nullable=True)
     notes = Column(Text, nullable=True)
@@ -187,9 +169,7 @@ class MembershipInstallment(Base):
     )
 
 
-# ============================================================
-# STABILITY ASSESSMENT
-# ============================================================
+
 
 class StabilityAssessment(Base):
     __tablename__ = "stability_assessments"
@@ -230,3 +210,4 @@ class StabilityAssessment(Base):
         server_default=func.now(),
         index=True,
     )
+

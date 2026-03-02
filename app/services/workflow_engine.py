@@ -5,13 +5,13 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from models.audit_logs import AuditLog
-from models.cases import Case
-from models.documents import Document
-from models.enums import CaseStatus
-from models.leads import Lead
-from models.properties import Property
-from models.workflow import (
+from app.models.audit_logs import AuditLog
+from app.models.cases import Case
+from app.models.documents import Document
+from app.models.enums import CaseStatus
+from app.models.leads import Lead
+from app.models.properties import Property
+from app.models.workflow import (
     CaseWorkflowInstance,
     CaseWorkflowProgress,
     WorkflowOverride,

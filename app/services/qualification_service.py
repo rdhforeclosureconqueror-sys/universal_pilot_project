@@ -1,4 +1,4 @@
-from models.member_layer import Application
+from app.models.member_layer import Application
 
 
 def qualifies(application: Application) -> bool:

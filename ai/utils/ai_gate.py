@@ -1,6 +1,6 @@
 from fastapi import HTTPException
-from models.consent_records import ConsentRecord
-from models.policy_versions import PolicyVersion
+from app.models.consent_records import ConsentRecord
+from app.models.policy_versions import PolicyVersion
 
 def check_ai_consent(case_id: str, db):
     consent = db.query(ConsentRecord).filter(
