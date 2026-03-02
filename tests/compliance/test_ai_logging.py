@@ -1,4 +1,4 @@
-from models.ai_activity_logs import AIActivityLog
+from app.models.ai_activity_logs import AIActivityLog
 from helpers.test_helpers import auth_headers, assume_role, create_case, grant_consent, ai_dryrun
 
 

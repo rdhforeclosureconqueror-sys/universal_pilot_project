@@ -6,9 +6,9 @@ from uuid import uuid4
 from datetime import datetime
 
 from db.session import get_db
-from models.cases import Case
-from models.policy_versions import PolicyVersion
-from schemas.bulk_upload import BulkUploadRequest, SingleCaseDraft
+from app.models.cases import Case
+from app.models.policy_versions import PolicyVersion
+from app.schemas.bulk_upload import BulkUploadRequest, SingleCaseDraft
 from audit.logger import log_audit
 
 router = APIRouter()

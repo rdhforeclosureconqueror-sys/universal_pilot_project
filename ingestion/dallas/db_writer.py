@@ -4,12 +4,12 @@ from uuid import uuid4
 
 from sqlalchemy.orm import Session
 
-from models.audit_logs import AuditLog
-from models.cases import Case
-from models.deal_scores import DealScore
-from models.enums import CaseStatus
-from models.properties import Property
-from services.workflow_engine import (
+from app.models.audit_logs import AuditLog
+from app.models.cases import Case
+from app.models.deal_scores import DealScore
+from app.models.enums import CaseStatus
+from app.models.properties import Property
+from app.services.workflow_engine import (
     initialize_case_workflow,
     sync_case_workflow,
 )
