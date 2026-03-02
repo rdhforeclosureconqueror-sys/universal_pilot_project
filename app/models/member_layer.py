@@ -1,5 +1,6 @@
 from __future__ import annotations
 import enum
+import uuid
 from sqlalchemy import Boolean, Column, Date, DateTime, ForeignKey, Integer, Numeric, Text
 from sqlalchemy.dialects.postgresql import ENUM, JSONB, UUID
 from sqlalchemy.sql import func
