@@ -45,23 +45,20 @@ class CheckinType(enum.Enum):
     support_request = "support_request"
 
 
+# =========================
+# APPLICATION
+# =========================
 
 class Application(Base):
     __tablename__ = "applications"
 
-    id = Column(
-        UUID(as_uuid=True),
-        primary_key=True,
-        default=uuid.uuid4,
-        nullable=False,
-    )
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, nullable=False)
 
     email = Column(Text, nullable=False)
     full_name = Column(Text, nullable=True)
     phone = Column(Text, nullable=True)
 
     program_key = Column(Text, nullable=False, index=True)
-
 
     status = Column(
         ENUM(ApplicationStatus, name="applicationstatus", create_type=False),
@@ -70,36 +67,20 @@ class Application(Base):
 
     answers_json = Column(JSONB, nullable=False)
 
-    created_at = Column(
-        DateTime(timezone=True),
-        nullable=False,
-        server_default=func.now(),
-    )
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    submitted_at = Column(DateTime(timezone=True), nullable=True)
 
-    submitted_at = Column(
-        DateTime(timezone=True),
-        nullable=True,
-    )
 
+# =========================
+# MEMBERSHIP
+# =========================
 
 class Membership(Base):
     __tablename__ = "memberships"
 
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, nullable=False)
 
-    id = Column(
-        UUID(as_uuid=True),
-        primary_key=True,
-        default=uuid.uuid4,
-        nullable=False,
-    )
-
-    user_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("users.id"),
-        nullable=False,
-        index=True,
-    )
-
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
     program_key = Column(Text, nullable=False, index=True)
 
     term_start = Column(Date, nullable=False)
@@ -108,39 +89,25 @@ class Membership(Base):
     annual_price_cents = Column(Integer, nullable=False)
     installment_cents = Column(Integer, nullable=False)
 
-
     status = Column(
         ENUM(MembershipStatus, name="membershipstatus", create_type=False),
         nullable=False,
         server_default="active",
     )
 
+    good_standing = Column(Boolean, nullable=False, server_default="true")
 
-    good_standing = Column(
-        Boolean,
-        nullable=False,
-        server_default="true",
-    )
-
-    created_at = Column(
-        DateTime(timezone=True),
-        nullable=False,
-        server_default=func.now(),
-    )
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
+# =========================
+# INSTALLMENTS
+# =========================
 
 class MembershipInstallment(Base):
     __tablename__ = "membership_installments"
 
-
-    id = Column(
-        UUID(as_uuid=True),
-        primary_key=True,
-        default=uuid.uuid4,
-        nullable=False,
-    )
-
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, nullable=False)
 
     membership_id = Column(
         UUID(as_uuid=True),
@@ -148,7 +115,6 @@ class MembershipInstallment(Base):
         nullable=False,
         index=True,
     )
-
 
     due_date = Column(Date, nullable=False, index=True)
     amount_cents = Column(Integer, nullable=False)
@@ -159,9 +125,34 @@ class MembershipInstallment(Base):
         server_default="due",
     )
 
-
     paid_at = Column(DateTime(timezone=True), nullable=True)
     notes = Column(Text, nullable=True)
+
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+# =========================
+# CONTRIBUTION CREDITS (RESTORED FIX)
+# =========================
+
+class ContributionCredit(Base):
+    __tablename__ = "contribution_credits"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, nullable=False)
+
+    membership_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("memberships.id"),
+        nullable=False,
+        index=True,
+    )
+
+    credit_type = Column(
+        ENUM(CreditType, name="credittype", create_type=False),
+        nullable=False,
+    )
+
+    description = Column(Text, nullable=True)
 
     created_at = Column(
         DateTime(timezone=True),
@@ -170,30 +161,18 @@ class MembershipInstallment(Base):
     )
 
 
-
+# =========================
+# STABILITY ASSESSMENT
+# =========================
 
 class StabilityAssessment(Base):
     __tablename__ = "stability_assessments"
 
-    id = Column(
-        UUID(as_uuid=True),
-        primary_key=True,
-        default=uuid.uuid4,
-        nullable=False,
-    )
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, nullable=False)
 
-    user_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("users.id"),
-        nullable=False,
-        index=True,
-    )
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
 
-    property_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("properties.id"),
-        nullable=True,
-    )
+    property_id = Column(UUID(as_uuid=True), ForeignKey("properties.id"), nullable=True)
 
     program_key = Column(Text, nullable=False, index=True)
 
@@ -211,4 +190,3 @@ class StabilityAssessment(Base):
         server_default=func.now(),
         index=True,
     )
-
