@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.models.system_verification import PhaseVerificationRun, SystemPhase
 from verification.phase1 import Phase1Verifier
+from verification.phase4 import Phase4Verifier
 
 
 class PhaseVerifier(ABC):
@@ -16,6 +17,7 @@ class PhaseVerifier(ABC):
 
 PHASE_REGISTRY: dict[str, PhaseVerifier] = {
     "phase1_intake_activation": Phase1Verifier(),
+    "phase4_admin_dashboard": Phase4Verifier(),
 }
 
 

@@ -11,6 +11,14 @@ from app.api.routes import (
     system_admin,
 )
 
+from app.api.routes import (
+    admin_dashboard,
+    member_dashboard,
+    member_payments,
+    public_apply,
+    system_admin,
+)
+
 # ✅ Import all route modules
 from api.routes import (
     ai,
@@ -81,6 +89,9 @@ app.include_router(workflow.router)
 app.include_router(partner_api.router)
 app.include_router(public_apply.router)
 app.include_router(system_admin.router)
+
+
+app.include_router(admin_dashboard.router)
 app.include_router(member_dashboard.router)
 app.include_router(member_payments.router)
 
