@@ -4,6 +4,12 @@ import os
 from fastapi import FastAPI
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
+from app.api.routes import (
+    member_dashboard,
+    member_payments,
+    public_apply,
+    system_admin,
+)
 
 from app.api.routes import (
     admin_dashboard,
@@ -83,11 +89,13 @@ app.include_router(workflow.router)
 app.include_router(partner_api.router)
 app.include_router(public_apply.router)
 app.include_router(system_admin.router)
+
+
 app.include_router(admin_dashboard.router)
 app.include_router(member_dashboard.router)
 app.include_router(member_payments.router)
 
-
 @app.get("/admin/system")
 def admin_system_page():
     return FileResponse(frontend_dir / "admin-system.html")
+  
