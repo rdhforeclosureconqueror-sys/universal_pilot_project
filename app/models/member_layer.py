@@ -1,12 +1,18 @@
 from __future__ import annotations
+
 import enum
 import uuid
+
 from sqlalchemy import Boolean, Column, Date, DateTime, ForeignKey, Integer, Numeric, Text
 from sqlalchemy.dialects.postgresql import ENUM, JSONB, UUID
 from sqlalchemy.sql import func
 
 from .base import Base
 
+
+# =====================================================
+# ENUMS
+# =====================================================
 
 class ApplicationStatus(enum.Enum):
     started = "started"
@@ -45,9 +51,9 @@ class CheckinType(enum.Enum):
     support_request = "support_request"
 
 
-# =========================
+# =====================================================
 # APPLICATION
-# =========================
+# =====================================================
 
 class Application(Base):
     __tablename__ = "applications"
@@ -67,20 +73,31 @@ class Application(Base):
 
     answers_json = Column(JSONB, nullable=False)
 
-    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    created_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+
     submitted_at = Column(DateTime(timezone=True), nullable=True)
 
 
-# =========================
+# =====================================================
 # MEMBERSHIP
-# =========================
+# =====================================================
 
 class Membership(Base):
     __tablename__ = "memberships"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, nullable=False)
 
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id"),
+        nullable=False,
+        index=True,
+    )
+
     program_key = Column(Text, nullable=False, index=True)
 
     term_start = Column(Date, nullable=False)
@@ -97,12 +114,16 @@ class Membership(Base):
 
     good_standing = Column(Boolean, nullable=False, server_default="true")
 
-    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    created_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
 
 
-# =========================
-# INSTALLMENTS
-# =========================
+# =====================================================
+# MEMBERSHIP INSTALLMENTS
+# =====================================================
 
 class MembershipInstallment(Base):
     __tablename__ = "membership_installments"
@@ -128,12 +149,16 @@ class MembershipInstallment(Base):
     paid_at = Column(DateTime(timezone=True), nullable=True)
     notes = Column(Text, nullable=True)
 
-    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    created_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
 
 
-# =========================
-# CONTRIBUTION CREDITS (RESTORED FIX)
-# =========================
+# =====================================================
+# CONTRIBUTION CREDITS
+# =====================================================
 
 class ContributionCredit(Base):
     __tablename__ = "contribution_credits"
@@ -161,18 +186,57 @@ class ContributionCredit(Base):
     )
 
 
-# =========================
-# STABILITY ASSESSMENT
-# =========================
+# =====================================================
+# MEMBER CHECKINS
+# =====================================================
+
+class MemberCheckin(Base):
+    __tablename__ = "member_checkins"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, nullable=False)
+
+    membership_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("memberships.id"),
+        nullable=False,
+        index=True,
+    )
+
+    checkin_type = Column(
+        ENUM(CheckinType, name="checkintype", create_type=False),
+        nullable=False,
+    )
+
+    notes = Column(Text, nullable=True)
+
+    created_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+
+
+# =====================================================
+# STABILITY ASSESSMENTS
+# =====================================================
 
 class StabilityAssessment(Base):
     __tablename__ = "stability_assessments"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, nullable=False)
 
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id"),
+        nullable=False,
+        index=True,
+    )
 
-    property_id = Column(UUID(as_uuid=True), ForeignKey("properties.id"), nullable=True)
+    property_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("properties.id"),
+        nullable=True,
+    )
 
     program_key = Column(Text, nullable=False, index=True)
 
