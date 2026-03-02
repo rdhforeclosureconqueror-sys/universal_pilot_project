@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
-from models.certifications import Certification
-from models.policy_versions import PolicyVersion
+from app.models.certifications import Certification
+from app.models.policy_versions import PolicyVersion
 from uuid import uuid4
 from datetime import datetime
 
