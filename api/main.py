@@ -5,8 +5,8 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-# App Routers (app/api/routes)
 from app.api.routes import (
+    admin_ai,
     admin_dashboard,
     member_dashboard,
     member_payments,
@@ -94,10 +94,9 @@ app.include_router(auction_imports.router)
 app.include_router(leads.router)
 app.include_router(workflow.router)
 app.include_router(partner_api.router)
-
 app.include_router(public_apply.router)
 app.include_router(system_admin.router)
-
+app.include_router(admin_ai.router)
 app.include_router(admin_dashboard.router)
 app.include_router(member_dashboard.router)
 app.include_router(member_payments.router)

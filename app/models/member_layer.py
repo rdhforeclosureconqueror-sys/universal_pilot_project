@@ -55,6 +55,10 @@ class CheckinType(enum.Enum):
 # APPLICATION
 # =====================================================
 
+# =====================================================
+# APPLICATION
+# =====================================================
+
 class Application(Base):
     __tablename__ = "applications"
 
@@ -146,6 +150,9 @@ class MembershipInstallment(Base):
         server_default="due",
     )
 
+    stripe_invoice_id = Column(Text, nullable=True, unique=True)
+    amount_paid_cents = Column(Integer, nullable=True)
+
     paid_at = Column(DateTime(timezone=True), nullable=True)
     notes = Column(Text, nullable=True)
 
@@ -172,9 +179,24 @@ class ContributionCredit(Base):
         index=True,
     )
 
+    installment_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("membership_installments.id"),
+        nullable=True,
+        index=True,
+    )
+
     credit_type = Column(
         ENUM(CreditType, name="credittype", create_type=False),
         nullable=False,
+    )
+
+    amount_cents_equivalent = Column(Integer, nullable=False)
+
+    evidence_document_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("documents.id"),
+        nullable=True,
     )
 
     description = Column(Text, nullable=True)
