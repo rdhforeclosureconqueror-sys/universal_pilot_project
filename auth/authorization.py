@@ -5,10 +5,10 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from audit.logger import log_audit
-from models.cases import Case
-from models.policy_versions import PolicyVersion
-from models.role_sessions import RoleSession
-from models.users import User
+from app.models.cases import Case
+from app.models.policy_versions import PolicyVersion
+from app.models.role_sessions import RoleSession
+from app.models.users import User
 
 
 class PolicyAuthorizer:

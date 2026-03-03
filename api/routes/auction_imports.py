@@ -15,8 +15,8 @@ from urllib.request import Request, urlopen
 
 from db.session import get_db
 from ingestion.dallas.dallas_pdf_ingestion import ingest_pdf
-from models.auction_import_model import AuctionImport
-from models.ingestion_metrics import IngestionMetric
+from app.models.auction_import_model import AuctionImport
+from app.models.ingestion_metrics import IngestionMetric
 
 router = APIRouter(prefix="/auction-imports", tags=["Auction Imports"])
 logger = logging.getLogger(__name__)

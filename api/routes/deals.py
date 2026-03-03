@@ -3,9 +3,9 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 
 from db.session import get_db
-from models.deal_scores import DealScore
-from models.properties import Property
-from models.cases import Case
+from app.models.deal_scores import DealScore
+from app.models.properties import Property
+from app.models.cases import Case
 
 router = APIRouter(prefix="/deals", tags=["Deals"])
 
