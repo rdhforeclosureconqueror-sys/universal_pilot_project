@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.models.audit_logs import AuditLog
 from app.models.member_layer import InstallmentStatus, Membership, MembershipInstallment
+from app.services.escalation_service import evaluate_member_risk
 from app.services.stability_service import recalculate_stability
 
 
@@ -43,6 +44,7 @@ def mark_installment_paid(db: Session, installment_id: UUID) -> MembershipInstal
         user_id=membership.user_id,
         program_key=membership.program_key,
     )
+    evaluate_member_risk(db=db, membership_id=membership.id)
 
     db.commit()
     db.refresh(installment)

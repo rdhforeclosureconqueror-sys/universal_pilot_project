@@ -8,6 +8,9 @@ from sqlalchemy.orm import Session
 from app.models.system_verification import PhaseVerificationRun, SystemPhase
 from verification.phase1 import Phase1Verifier
 from verification.phase4 import Phase4Verifier
+from verification.phase6 import Phase6Verifier
+
+
 from verification.phase5 import Phase5Verifier
 
 
@@ -29,6 +32,7 @@ PHASE_REGISTRY: Dict[str, PhaseVerifier] = {
     "phase1_intake_activation": Phase1Verifier(),
     "phase4_admin_dashboard": Phase4Verifier(),
     "phase5_member_stability_engine": Phase5Verifier(),
+    "phase6_risk_escalation": Phase6Verifier(),
 }
 
 

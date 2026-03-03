@@ -14,6 +14,7 @@ from app.api.routes import (
     system_admin,
 )
 
+
 # Core API Routers (api/routes)
 from api.routes import (
     ai,
@@ -28,7 +29,7 @@ from api.routes import (
     training,
     properties,
     auction_imports,
-    leads,
+    leads,  # ✅ Newly added auction import route
     workflow,
     partner_api,
 )
@@ -48,21 +49,25 @@ frontend_dir = Path(__file__).resolve().parent.parent / "frontend"
 app.mount("/static", StaticFiles(directory=frontend_dir), name="static")
 
 
+# ✅ Serve the root index.html
 @app.get("/")
 def read_root():
     return FileResponse(frontend_dir / "index.html")
 
 
+# ✅ Serve CSS
 @app.get("/styles.css")
 def read_styles():
     return FileResponse(frontend_dir / "styles.css")
 
 
+# ✅ Serve JavaScript
 @app.get("/app.js")
 def read_app_js():
     return FileResponse(frontend_dir / "app.js")
 
 
+# ✅ Serve dynamic config.js for API base
 @app.get("/config.js")
 def read_config():
     api_base = os.getenv("VITE_API_BASE_URL", "").strip()
@@ -107,3 +112,5 @@ app.include_router(webhooks.router)
 @app.get("/admin/system")
 def admin_system_page():
     return FileResponse(frontend_dir / "admin-system.html")
+
+app.include_router(webhooks.router)
