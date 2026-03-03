@@ -6,10 +6,10 @@ from auth.dependencies import require_role
 from sqlalchemy.orm import Session
 
 from db.session import get_db
-from models.cases import Case
-from models.documents import Document
-from models.users import UserRole
-from services.workflow_engine import get_case_workflow_summary, initialize_case_workflow, sync_case_workflow
+from app.models.cases import Case
+from app.models.documents import Document
+from app.models.users import UserRole
+from app.services.workflow_engine import get_case_workflow_summary, initialize_case_workflow, sync_case_workflow
 
 router = APIRouter(prefix="/partner/v1", tags=["Partner API"])
 

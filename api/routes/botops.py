@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from db.session import get_db
-from models.botops import (
+from app.models.botops import (
     BotSetting,
     BotReport,
     BotCommand,
@@ -13,8 +13,8 @@ from models.botops import (
     BotInboundLog,
     BotPage,
 )
-from models.leads import Lead
-from schemas.botops import (
+from app.models.leads import Lead
+from app.schemas.botops import (
     BotSettingUpsert,
     BotReportCreate,
     BotReportRead,

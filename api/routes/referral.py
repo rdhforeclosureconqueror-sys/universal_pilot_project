@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from models.referrals import Referral
-from models.consent_records import ConsentRecord
-from models.outbox_queue import OutboxQueue
-from models.audit_logs import AuditLog
+from app.models.referrals import Referral
+from app.models.consent_records import ConsentRecord
+from app.models.outbox_queue import OutboxQueue
+from app.models.audit_logs import AuditLog
 from db.session import get_db
 from auth.authorization import PolicyAuthorizer
 from auth.dependencies import get_current_user
