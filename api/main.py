@@ -13,9 +13,9 @@ from app.api.routes import (
     public_apply,
     system_admin,
 )
-from app.routers import webhooks
 
-# ✅ Import all route modules
+
+# Core API Routers (api/routes)
 from api.routes import (
     ai,
     auth,
@@ -34,9 +34,17 @@ from api.routes import (
     partner_api,
 )
 
+# Webhooks
+from app.routers import webhooks
+
+
 app = FastAPI()
-app.include_router(leads.router)
-# ✅ Mount static frontend directory (relative to this file)
+
+
+# =====================================================
+# Frontend Static Mount
+# =====================================================
+
 frontend_dir = Path(__file__).resolve().parent.parent / "frontend"
 app.mount("/static", StaticFiles(directory=frontend_dir), name="static")
 
@@ -67,7 +75,10 @@ def read_config():
     return Response(content=js, media_type="application/javascript")
 
 
-# ✅ Register all routers
+# =====================================================
+# Register Core Routers
+# =====================================================
+
 app.include_router(ai.router)
 app.include_router(auth.router)
 app.include_router(bulk_upload.router)
@@ -79,9 +90,9 @@ app.include_router(documents.router)
 app.include_router(referral.router)
 app.include_router(training.router)
 app.include_router(properties.router)
-app.include_router(auction_imports.router)  # ✅ Needed for /auction-imports/*
+app.include_router(auction_imports.router)
+app.include_router(leads.router)
 app.include_router(workflow.router)
-
 app.include_router(partner_api.router)
 app.include_router(public_apply.router)
 app.include_router(system_admin.router)
@@ -90,6 +101,12 @@ app.include_router(admin_dashboard.router)
 app.include_router(member_dashboard.router)
 app.include_router(member_payments.router)
 
+app.include_router(webhooks.router)
+
+
+# =====================================================
+# Admin System Page
+# =====================================================
 
 @app.get("/admin/system")
 def admin_system_page():

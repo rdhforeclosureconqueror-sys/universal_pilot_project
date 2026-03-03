@@ -62,7 +62,7 @@ def parse_dallas_row(row: List[str]) -> Optional[dict]:
     trustee = _get_cell(cells, 5)
     mortgagor = _get_cell(cells, 6)
     mortgagee = _get_cell(cells, 7)
-    auction_date = _parse_date(_get_cell(cells, 8))
+    auction_date = parse_date(_get_cell(cells, 8))
     case_number = normalize_case_number(_get_cell(cells, 9))
     opening_bid = _get_cell(cells, 10).strip() if len(cells) > 10 else None
 
