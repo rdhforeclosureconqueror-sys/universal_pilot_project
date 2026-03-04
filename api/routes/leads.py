@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from db.session import get_db
-from models.leads import Lead
+from app.models.leads import Lead
 
 router = APIRouter(prefix="/leads", tags=["leads"])
 

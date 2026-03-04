@@ -1,11 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, Form
+from fastapi import APIRouter, Depends, Form
 from sqlalchemy.orm import Session
-from auth.auth_handler import verify_password, create_access_token
+
 from auth.authorization import PolicyAuthorizer
 from auth.dependencies import get_current_user
-from models.users import User
+from app.models.users import User
+from app.services.auth_service import AuthService
 from db.session import get_db
-
 from pydantic import BaseModel
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
@@ -16,6 +16,17 @@ class Token(BaseModel):
     token_type: str
 
 
+class RegisterRequest(BaseModel):
+    email: str
+    password: str
+
+
+class CreateAdminRequest(BaseModel):
+    email: str
+    password: str
+    admin_secret: str | None = None
+
+
 class AssumeRoleRequest(BaseModel):
     role_name: str
     case_id: str | None = None
@@ -23,18 +34,37 @@ class AssumeRoleRequest(BaseModel):
     duration_minutes: int = 30
 
 
+@router.post("/register", response_model=dict)
+def register_user(request: RegisterRequest, db: Session = Depends(get_db)):
+    user = AuthService(db).register_user(email=request.email, password=request.password)
+    return {
+        "user_id": str(user.id),
+        "email": user.email,
+        "role": user.role.value if user.role else None,
+    }
+
+
+@router.post("/create-admin", response_model=dict)
+def create_admin(request: CreateAdminRequest, db: Session = Depends(get_db)):
+    user = AuthService(db).create_admin(
+        email=request.email,
+        password=request.password,
+        admin_secret=request.admin_secret,
+    )
+    return {
+        "user_id": str(user.id),
+        "email": user.email,
+        "role": user.role.value if user.role else None,
+    }
+
+
 @router.post("/token", response_model=Token)
 def login_for_access_token(
     db: Session = Depends(get_db),
     username: str = Form(...),
-    password: str = Form(...)
+    password: str = Form(...),
 ):
-    user = db.query(User).filter(User.email == username).first()
-    if not user or not verify_password(password, user.hashed_password):
-        raise HTTPException(status_code=401, detail="Incorrect email or password")
-
-    token = create_access_token(data={"sub": str(user.id), "email": user.email})
-    return {"access_token": token, "token_type": "bearer"}
+    return AuthService(db).login(username=username, password=password)
 
 
 @router.post("/assume-role")
@@ -65,5 +95,5 @@ def read_users_me(current_user: User = Depends(get_current_user)):
         "user_id": str(current_user.id),
         "email": current_user.email,
         "role": current_user.role.value if current_user.role else None,
-        "name": current_user.full_name
+        "name": current_user.full_name,
     }
