@@ -54,3 +54,5 @@ from .member_layer import (
 )
 
 from .system_verification import SystemPhase, PhaseVerificationRun
+
+from .module_registry import ModuleRegistry
