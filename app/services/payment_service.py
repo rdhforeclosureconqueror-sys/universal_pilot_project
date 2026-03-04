@@ -51,6 +51,52 @@ def mark_installment_paid(db: Session, installment_id: UUID) -> MembershipInstal
     return installment
 
 
+def evaluate_member_risk(db: Session, membership_id: UUID) -> None:
+    membership = db.query(Membership).filter(Membership.id == membership_id).first()
+    if not membership:
+        raise PaymentProcessingError(f"Membership not found for id={membership_id}")
+
+    has_missed = (
+        db.query(MembershipInstallment.id)
+        .filter(
+            MembershipInstallment.membership_id == membership.id,
+            MembershipInstallment.status == InstallmentStatus.missed,
+        )
+        .first()
+        is not None
+    )
+
+    before_standing = bool(membership.good_standing)
+    if has_missed:
+        membership.good_standing = False
+
+    reason_code = f"membership_risk_{membership.id}_{int(has_missed)}"
+    existing_audit = (
+        db.query(AuditLog.id)
+        .filter(
+            AuditLog.reason_code == reason_code,
+            AuditLog.action_type == "membership_risk_evaluated",
+        )
+        .first()
+    )
+    if existing_audit:
+        return
+
+    db.add(
+        AuditLog(
+            case_id=None,
+            actor_id=None,
+            actor_is_ai=False,
+            action_type="membership_risk_evaluated",
+            reason_code=reason_code,
+            before_state={"good_standing": before_standing},
+            after_state={"good_standing": bool(membership.good_standing), "has_missed_installments": has_missed},
+            policy_version_id=None,
+        )
+    )
+
+
+
 def handle_successful_payment(
     db: Session,
     stripe_invoice_id: str,
