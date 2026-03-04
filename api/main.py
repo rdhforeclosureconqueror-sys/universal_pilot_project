@@ -5,17 +5,9 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from app.api.routes import (
-    admin_ai,
-    admin_dashboard,
-    member_dashboard,
-    member_payments,
-    public_apply,
-    system_admin,
-)
-
-
 # Core API Routers (api/routes)
+from app.services.auth_service import ensure_admin_user
+from db.session import SessionLocal
 from api.routes import (
     ai,
     auth,
@@ -32,6 +24,12 @@ from api.routes import (
     leads,  # ✅ Newly added auction import route
     workflow,
     partner_api,
+    admin_ai,
+    admin_dashboard,
+    member_dashboard,
+    member_payments,
+    public_apply,
+    system_admin,
 )
 
 # Webhooks
@@ -113,3 +111,12 @@ def admin_system_page():
     return FileResponse(frontend_dir / "admin-system.html")
 
 app.include_router(webhooks.router)
+
+
+@app.on_event("startup")
+def bootstrap_admin_user() -> None:
+    db = SessionLocal()
+    try:
+        ensure_admin_user(db)
+    finally:
+        db.close()

@@ -6,6 +6,7 @@ import enum
 from .base import Base
 
 class UserRole(enum.Enum):
+    user = "user"
     case_worker = "case_worker"
     referral_coordinator = "referral_coordinator"
     admin = "admin"

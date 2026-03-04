@@ -1,12 +1,11 @@
+from datetime import date, timedelta
+from uuid import uuid4
+
 from sqlalchemy.orm import Session
 
+from app.models.member_layer import InstallmentStatus, Membership, MembershipInstallment, MembershipStatus, StabilityAssessment
+from app.models.users import User
 from app.services.stability_service import recalculate_stability
-from app.models.member_layer import (
-    Membership,
-    MembershipInstallment,
-    ContributionCredit,
-    StabilityAssessment,
-)
 
 
 class Phase5Verifier:

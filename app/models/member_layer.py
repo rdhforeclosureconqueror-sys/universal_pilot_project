@@ -55,9 +55,6 @@ class CheckinType(enum.Enum):
 # APPLICATION
 # =====================================================
 
-# =====================================================
-# APPLICATION
-# =====================================================
 
 class Application(Base):
     __tablename__ = "applications"
