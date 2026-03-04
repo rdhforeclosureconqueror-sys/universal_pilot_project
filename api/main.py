@@ -5,10 +5,12 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-# Core API Routers (api/routes)
+# Core services
 from app.services.auth_service import ensure_admin_user
 from db.session import SessionLocal
-from api.routes import (
+
+# API Routers
+from app.api.routes import (
     ai,
     auth,
     bulk_upload,
@@ -21,7 +23,7 @@ from api.routes import (
     training,
     properties,
     auction_imports,
-    leads,  # ✅ Newly added auction import route
+    leads,
     workflow,
     partner_api,
     admin_ai,
@@ -31,6 +33,11 @@ from api.routes import (
     public_apply,
     system_admin,
 )
+
+# Models / schemas / services
+from app.models.users import User
+from app.schemas.ai_orchestration import AIExecuteRequest
+from app.services.ai_orchestration_service import execute_message
 
 # Webhooks
 from app.routers import webhooks
