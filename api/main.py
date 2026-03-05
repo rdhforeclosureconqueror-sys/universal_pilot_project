@@ -7,6 +7,7 @@ from fastapi.staticfiles import StaticFiles
 
 # Core services
 from app.services.auth_service import ensure_admin_user
+from app.services.module_loader_service import load_modules_on_startup
 from db.session import SessionLocal
 
 # -----------------------------------------------------
@@ -28,6 +29,7 @@ from api.routes import (
     leads,
     workflow,
     partner_api,
+    impact_api,
 )
 
 # -----------------------------------------------------
@@ -96,6 +98,7 @@ app.include_router(auction_imports.router)
 app.include_router(leads.router)
 app.include_router(workflow.router)
 app.include_router(partner_api.router)
+app.include_router(impact_api.router)
 
 app.include_router(public_apply.router)
 app.include_router(system_admin.router)
@@ -122,3 +125,6 @@ def bootstrap_admin_user() -> None:
         ensure_admin_user(db)
     finally:
         db.close()
+
+    # Safe dynamic module activation (Phase 8 loader foundation)
+    load_modules_on_startup(app)
