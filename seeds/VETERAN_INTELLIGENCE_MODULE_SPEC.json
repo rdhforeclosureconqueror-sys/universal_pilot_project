@@ -33,6 +33,7 @@
     "generate_veteran_documents",
     "update_benefit_progress",
     "veteran_ai_advisory",
-    "veteran_partner_aggregate_report"
+    "veteran_partner_aggregate_report",
+    "calculate_veteran_benefit_value"
   ]
 }

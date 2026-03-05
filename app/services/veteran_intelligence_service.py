@@ -171,6 +171,39 @@ def match_benefits(db: Session, *, case_id: UUID) -> dict:
     }
 
 
+
+
+def calculate_benefit_value(db: Session, *, case_id: UUID) -> dict:
+    matches = match_benefits(db, case_id=case_id)
+    benefit_names = matches.get("eligible_benefits", [])
+
+    value_map = {row.benefit_name: float(row.estimated_value or 0.0) for row in db.query(BenefitRegistry).all()}
+    for benefit in DEFAULT_BENEFITS:
+        value_map.setdefault(benefit["benefit_name"], float(benefit.get("estimated_value") or 0.0))
+
+    annual_total = sum(value_map.get(name, 0.0) for name in benefit_names)
+    monthly_total = annual_total / 12 if annual_total else 0.0
+    lifetime_total = annual_total * 30
+
+    breakdown = [
+        {
+            "benefit_name": name,
+            "monthly_value": round(value_map.get(name, 0.0) / 12, 2),
+            "annual_value": round(value_map.get(name, 0.0), 2),
+            "lifetime_value": round(value_map.get(name, 0.0) * 30, 2),
+        }
+        for name in benefit_names
+    ]
+
+    return {
+        "case_id": str(case_id),
+        "eligible_benefits": benefit_names,
+        "monthly_total": round(monthly_total, 2),
+        "annual_total": round(annual_total, 2),
+        "lifetime_total": round(lifetime_total, 2),
+        "benefit_breakdown": breakdown,
+    }
+
 def generate_action_plan(db: Session, *, case_id: UUID) -> dict:
     matches = match_benefits(db, case_id=case_id)
     steps: list[str] = ["Request VA Certificate of Eligibility"]

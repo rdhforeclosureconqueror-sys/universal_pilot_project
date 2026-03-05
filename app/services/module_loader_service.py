@@ -12,6 +12,7 @@ from app.models.module_registry import ModuleRegistry
 from app.models.users import User
 from app.services.escalation_service import run_daily_risk_evaluation
 from app.services.veteran_intelligence_service import (
+    calculate_benefit_value,
     generate_action_plan,
     generate_documents,
     get_advisory,
@@ -44,6 +45,7 @@ class DomainServiceBroker:
             "update_benefit_progress": ("veteran_intelligence_service", self._update_benefit_progress, True),
             "veteran_ai_advisory": ("veteran_intelligence_service", self._veteran_ai_advisory, True),
             "veteran_partner_aggregate_report": ("veteran_intelligence_service", self._veteran_partner_aggregate_report, False),
+            "calculate_veteran_benefit_value": ("veteran_intelligence_service", self._calculate_veteran_benefit_value, True),
         }
 
         self.allowed_services = {
@@ -120,12 +122,14 @@ class DomainServiceBroker:
     def _generate_veteran_documents(db: Session, payload: dict[str, Any], requires_actor: bool, actor_id: UUID | None):
         if requires_actor and actor_id is None:
             raise HTTPException(status_code=400, detail="actor_id required")
+
         case_id = _payload_uuid(payload, "case_id")
         return generate_documents(db, case_id=case_id, actor_id=actor_id)
 
     @staticmethod
     def _update_benefit_progress(db: Session, payload: dict[str, Any], _, actor_id: UUID | None):
         case_id = _payload_uuid(payload, "case_id")
+
         return update_benefit_progress(
             db,
             case_id=case_id,
@@ -144,8 +148,14 @@ class DomainServiceBroker:
     def _veteran_partner_aggregate_report(db: Session, payload: dict[str, Any], *_):
         return {"rows": partner_aggregate_report(db, state_of_residence=payload.get("state_of_residence"))}
 
+    @staticmethod
+    def _calculate_veteran_benefit_value(db: Session, payload: dict[str, Any], *_):
+        case_id = _payload_uuid(payload, "case_id")
+        return calculate_benefit_value(db, case_id=case_id)
+
 
 class ModuleLoaderService:
+
     def __init__(self, app: FastAPI, db: Session):
         self.app = app
         self.db = db
@@ -153,6 +163,7 @@ class ModuleLoaderService:
         self.domain_broker = DomainServiceBroker()
 
     def load_active_modules(self) -> int:
+
         active_modules = (
             self.db.query(ModuleRegistry)
             .filter(ModuleRegistry.is_active.is_(True), ModuleRegistry.status == "active")
@@ -299,26 +310,6 @@ class ModuleLoaderService:
 
         self.app.include_router(router)
 
-    def _log_load_event(self, *, module: ModuleRegistry, reason_code: str, after_state: dict[str, Any]) -> None:
-
-        self.db.add(
-            AuditLog(
-                id=uuid4(),
-                case_id=None,
-                actor_id=None,
-                actor_is_ai=False,
-                action_type="module_loader",
-                reason_code=reason_code,
-                before_state={
-                    "module_name": module.module_name,
-                    "version": module.version,
-                    "status": module.status,
-                },
-                after_state=after_state,
-                policy_version_id=None,
-            )
-        )
-
 
 def load_modules_on_startup(app: FastAPI) -> int:
 
@@ -326,6 +317,7 @@ def load_modules_on_startup(app: FastAPI) -> int:
 
     try:
         return ModuleLoaderService(app, db).load_active_modules()
+
     finally:
         db.close()
 

@@ -29,6 +29,7 @@ from api.routes import (
     leads,
     workflow,
     partner_api,
+    impact_api,
 )
 
 # -----------------------------------------------------
@@ -97,6 +98,7 @@ app.include_router(auction_imports.router)
 app.include_router(leads.router)
 app.include_router(workflow.router)
 app.include_router(partner_api.router)
+app.include_router(impact_api.router)
 
 app.include_router(public_apply.router)
 app.include_router(system_admin.router)
