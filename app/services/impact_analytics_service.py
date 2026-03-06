@@ -99,3 +99,21 @@ def _collect_case_impact_rows(db: Session) -> list[dict[str, Any]]:
         )
 
     return rows
+
+
+
+def get_housing_summary(db: Session) -> dict[str, Any]:
+    rows = _collect_case_impact_rows(db)
+    total_value_discovered = sum(r["benefit_value_discovered"] for r in rows)
+    homes_saved = sum(1 for r in rows if r["foreclosure_prevented"])
+    homes_acquired = sum(1 for r in rows if r["benefits_claimed"] > 0 and r["benefit_value_discovered"] >= 25000)
+    equity_preserved = round(total_value_discovered * 0.35, 2)
+    homeowners_stabilized = sum(1 for r in rows if r["benefits_claimed"] > 0)
+
+    return {
+        "homes_saved": homes_saved,
+        "homes_acquired": homes_acquired,
+        "equity_preserved": equity_preserved,
+        "portfolio_value": round(total_value_discovered, 2),
+        "homeowners_stabilized": homeowners_stabilized,
+    }

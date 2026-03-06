@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from auth.dependencies import require_role
 from app.models.users import UserRole
 from db.session import get_db
-from app.services.impact_analytics_service import get_impact_summary, get_opportunity_map
+from app.services.impact_analytics_service import get_housing_summary, get_impact_summary, get_opportunity_map
 from app.services.platform_capability_service import get_platform_capabilities
 
 
@@ -32,3 +32,11 @@ def platform_capabilities(
     _user=Depends(require_role([UserRole.admin, UserRole.audit_steward, UserRole.partner_org])),
 ):
     return {"capabilities": get_platform_capabilities()}
+
+
+@router.get("/impact/housing-summary")
+def impact_housing_summary(
+    db: Session = Depends(get_db),
+    _user=Depends(require_role([UserRole.admin, UserRole.audit_steward, UserRole.partner_org])),
+):
+    return get_housing_summary(db)
