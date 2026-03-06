@@ -1,0 +1,39 @@
+{
+  "module_name": "foreclosure_housing_os",
+  "module_type": "housing_operating_system",
+  "version": "1.0.0",
+  "permissions": [
+    "foreclosure.profile.create",
+    "foreclosure.property.analyze",
+    "partners.route_case",
+    "portfolio.add_property",
+    "portfolio.summary",
+    "membership.create"
+  ],
+  "required_services": [
+    "foreclosure_intelligence_service",
+    "property_analysis_service",
+    "partner_routing_service",
+    "property_portfolio_service",
+    "membership_service"
+  ],
+  "data_schema": {
+    "inputs": {
+      "case_id": "uuid",
+      "state": "string",
+      "routing_category": "string"
+    },
+    "outputs": {
+      "priority_score": "number",
+      "classification": "string"
+    }
+  },
+  "allowed_actions": [
+    "calculate_case_priority",
+    "analyze_property",
+    "route_case_partner",
+    "add_property_to_portfolio",
+    "portfolio_summary",
+    "create_membership_profile"
+  ]
+}
