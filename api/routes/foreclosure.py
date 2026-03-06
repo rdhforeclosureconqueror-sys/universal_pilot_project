@@ -1,11 +1,19 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.schemas.foreclosure_intelligence import ForeclosureAnalyzeRequest, ForeclosureCreateRequest
+from app.schemas.foreclosure_intelligence import (
+    ForeclosureAnalyzeRequest,
+    ForeclosureCreateRequest,
+)
 from auth.authorization import PolicyAuthorizer
 from auth.dependencies import get_current_user
 from db.session import get_db
-from app.services.foreclosure_intelligence_service import calculate_case_priority, create_foreclosure_profile
+
+from app.services.foreclosure_intelligence_service import (
+    calculate_case_priority,
+    create_foreclosure_profile,
+)
+
 from app.services.property_analysis_service import (
     calculate_acquisition_score,
     calculate_equity,
@@ -25,10 +33,21 @@ def create_profile(
     user=Depends(get_current_user),
 ):
     if request.case_id:
-        PolicyAuthorizer(db).require_case_action(user=user, case_id=str(request.case_id), action="foreclosure.profile.create")
+        PolicyAuthorizer(db).require_case_action(
+            user=user,
+            case_id=str(request.case_id),
+            action="foreclosure.profile.create",
+        )
 
     payload = request.model_dump(exclude={"case_id"}, exclude_none=True)
-    result = create_foreclosure_profile(db, case_id=request.case_id, payload=payload, actor_id=user.id)
+
+    result = create_foreclosure_profile(
+        db,
+        case_id=request.case_id,
+        payload=payload,
+        actor_id=user.id,
+    )
+
     db.commit()
 
     return {
