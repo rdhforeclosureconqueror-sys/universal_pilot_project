@@ -6,7 +6,10 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.models.audit_logs import AuditLog
+from app.models.cases import Case
+from app.models.enums import CaseStatus
 from app.models.housing_intelligence import ForeclosureCaseData
+from app.models.policy_versions import PolicyVersion
 
 
 def create_foreclosure_profile(
@@ -14,47 +17,43 @@ def create_foreclosure_profile(
     *,
     case_id: UUID | None,
     payload: dict,
-    actor_id: UUID | None
-) -> ForeclosureCaseData:
+    actor_id: UUID | None,
+) -> dict:
 
     # ---------------------------------------------------
-    # Auto-create case_id if not provided
+    # Resolve or auto-create case
     # ---------------------------------------------------
 
-    if not case_id:
-        case_id = uuid4()
+    resolved_case_id = case_id or _auto_create_case(
+        db,
+        actor_id=actor_id,
+        payload=payload,
+    )
 
     # ---------------------------------------------------
-    # Check if profile already exists
+    # Check existing foreclosure profile
     # ---------------------------------------------------
 
     profile = (
         db.query(ForeclosureCaseData)
-        .filter(ForeclosureCaseData.case_id == case_id)
+        .filter(ForeclosureCaseData.case_id == resolved_case_id)
         .first()
     )
 
     if profile:
-        raise HTTPException(
-            status_code=409,
-            detail="Foreclosure profile already exists for case"
-        )
+        return {
+            "case_id": resolved_case_id,
+            "profile_created": True,
+            "profile_id": profile.id,
+        }
 
     # ---------------------------------------------------
     # Create foreclosure profile
     # ---------------------------------------------------
 
     profile = ForeclosureCaseData(
-        id=uuid4(),
-        case_id=case_id,
-        property_address=payload.get("property_address"),
-        city=payload.get("city"),
-        state=payload.get("state"),
-        loan_balance=payload.get("loan_balance"),
-        estimated_property_value=payload.get("estimated_property_value"),
-        arrears_amount=payload.get("arrears_amount"),
-        homeowner_income=payload.get("homeowner_income"),
-        foreclosure_stage=payload.get("foreclosure_stage", "pre_foreclosure"),
+        case_id=resolved_case_id,
+        **payload,
     )
 
     db.add(profile)
@@ -67,13 +66,17 @@ def create_foreclosure_profile(
     _audit(
         db,
         actor_id=actor_id,
-        case_id=case_id,
+        case_id=resolved_case_id,
         action_type="foreclosure_profile_created",
         reason_code="foreclosure_profile_created",
         after_state={"profile_id": str(profile.id)},
     )
 
-    return profile
+    return {
+        "case_id": resolved_case_id,
+        "profile_created": True,
+        "profile_id": profile.id,
+    }
 
 
 def update_foreclosure_status(
@@ -81,7 +84,7 @@ def update_foreclosure_status(
     *,
     case_id: UUID,
     foreclosure_stage: str,
-    actor_id: UUID | None
+    actor_id: UUID | None,
 ) -> ForeclosureCaseData:
 
     profile = (
@@ -93,7 +96,7 @@ def update_foreclosure_status(
     if not profile:
         raise HTTPException(
             status_code=404,
-            detail="Foreclosure profile not found"
+            detail="Foreclosure profile not found",
         )
 
     before = profile.foreclosure_stage
@@ -109,7 +112,7 @@ def update_foreclosure_status(
         reason_code="foreclosure_stage_updated",
         after_state={
             "before_stage": before,
-            "after_stage": foreclosure_stage
+            "after_stage": foreclosure_stage,
         },
     )
 
@@ -127,7 +130,7 @@ def calculate_case_priority(db: Session, *, case_id: UUID) -> dict:
     if not profile:
         raise HTTPException(
             status_code=404,
-            detail="Foreclosure profile not found"
+            detail="Foreclosure profile not found",
         )
 
     stage = (profile.foreclosure_stage or "").lower()
@@ -144,7 +147,7 @@ def calculate_case_priority(db: Session, *, case_id: UUID) -> dict:
 
     pressure = 0
     if income > 0:
-        pressure = min(40, (arrears / income) * 10)
+        pressure = min(40, (arrears / max(income, 1)) * 10)
 
     score = min(100, stage_weight + pressure)
 
@@ -169,7 +172,7 @@ def _audit(
     case_id: UUID,
     action_type: str,
     reason_code: str,
-    after_state: dict
+    after_state: dict,
 ) -> None:
 
     db.add(
@@ -185,3 +188,53 @@ def _audit(
             policy_version_id=None,
         )
     )
+
+
+def _auto_create_case(
+    db: Session,
+    *,
+    actor_id: UUID | None,
+    payload: dict,
+) -> UUID:
+
+    policy = (
+        db.query(PolicyVersion)
+        .filter(PolicyVersion.is_active.is_(True))
+        .order_by(PolicyVersion.created_at.desc())
+        .first()
+    )
+
+    if not policy:
+        raise HTTPException(
+            status_code=400,
+            detail="No active policy available to initialize case",
+        )
+
+    case = Case(
+        status=CaseStatus.intake_submitted,
+        created_by=actor_id,
+        program_type=policy.program_key,
+        program_key=policy.program_key,
+        case_type="foreclosure_intelligence",
+        meta={
+            "property_address": payload.get("property_address"),
+            "city": payload.get("city"),
+            "state": payload.get("state"),
+            "origin": "foreclosure_create_profile",
+        },
+        policy_version_id=policy.id,
+    )
+
+    db.add(case)
+    db.flush()
+
+    _audit(
+        db,
+        actor_id=actor_id,
+        case_id=case.id,
+        action_type="foreclosure_case_auto_created",
+        reason_code="auto_case_initialized",
+        after_state={"program_key": policy.program_key},
+    )
+
+    return case.id

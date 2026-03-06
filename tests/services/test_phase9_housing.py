@@ -22,6 +22,9 @@ class _Query:
     def filter(self, *_args, **_kwargs):
         return self
 
+    def order_by(self, *_args, **_kwargs):
+        return self
+
     def first(self):
         return self.rows[0] if self.rows else None
 
@@ -48,7 +51,7 @@ def test_foreclosure_case_creation_and_priority():
     case_id = uuid4()
     db = _DB({"ForeclosureCaseData": []})
 
-    profile = create_foreclosure_profile(
+    profile_result = create_foreclosure_profile(
         db,
         case_id=case_id,
         payload={
@@ -59,7 +62,7 @@ def test_foreclosure_case_creation_and_priority():
         },
         actor_id=uuid4(),
     )
-    assert str(profile.case_id) == str(case_id)
+    assert str(profile_result["case_id"]) == str(case_id)
 
     db2 = _DB({"ForeclosureCaseData": [SimpleNamespace(foreclosure_stage="auction_scheduled", arrears_amount=5000, homeowner_income=2000)]})
     priority = calculate_case_priority(db2, case_id=case_id)
@@ -113,3 +116,47 @@ def test_onboarding_guide_responses():
     assert len(workflow) >= 7
     assert step is not None
     assert step["related_endpoint"] == "/foreclosure/analyze-property"
+
+
+
+def test_create_foreclosure_profile_auto_case(monkeypatch):
+    from app.models.policy_versions import PolicyVersion
+    from app.models.cases import Case
+
+    policy = SimpleNamespace(id=uuid4(), program_key="training_sandbox")
+
+    class _DBAuto(_DB):
+        def __init__(self):
+            super().__init__({"ForeclosureCaseData": [], "PolicyVersion": [policy]})
+
+    db = _DBAuto()
+
+    # patch query behavior for Case add/flush result id assignment approximation
+    created_cases = []
+    old_add = db.add
+
+    def _add(obj):
+        if obj.__class__.__name__ == Case.__name__ and not getattr(obj, "id", None):
+            obj.id = uuid4()
+            created_cases.append(obj)
+        old_add(obj)
+
+    db.add = _add
+
+    result = create_foreclosure_profile(
+        db,
+        case_id=None,
+        payload={
+            "property_address": "123 Main St",
+            "city": "Dallas",
+            "state": "TX",
+            "loan_balance": 210000,
+            "estimated_property_value": 320000,
+            "arrears_amount": 15000,
+            "foreclosure_stage": "pre_foreclosure",
+        },
+        actor_id=uuid4(),
+    )
+
+    assert result["profile_created"] is True
+    assert result["case_id"] is not None

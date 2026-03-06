@@ -34,6 +34,8 @@ from api.routes import (
     partners_housing,
     portfolio,
     membership,
+    pipeline,
+    verify,
 )
 
 # -----------------------------------------------------
@@ -107,6 +109,8 @@ app.include_router(foreclosure.router)
 app.include_router(partners_housing.router)
 app.include_router(portfolio.router)
 app.include_router(membership.router)
+app.include_router(pipeline.router)
+app.include_router(verify.router)
 
 app.include_router(public_apply.router)
 app.include_router(system_admin.router)

@@ -36,7 +36,15 @@ def route_case_to_partner(
         .first()
     )
     if not partner:
-        raise HTTPException(status_code=404, detail="No partner organization available for routing")
+        partner = PartnerOrganization(
+            name=f"Default {routing_category.title()} Partner",
+            service_type=service_type,
+            service_region=state,
+            contact_info={"mode": "system_seed"},
+            api_endpoint=None,
+        )
+        db.add(partner)
+        db.flush()
 
     referral = PartnerReferral(
         case_id=case_id,
