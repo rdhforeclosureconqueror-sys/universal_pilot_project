@@ -11,6 +11,8 @@ from policy.loader import PolicyEngine
 from uuid import uuid4
 from datetime import datetime
 
+from app.services.system_training_service import get_guide_step, get_system_overview, get_workflow_guide
+
 router = APIRouter(prefix="/training", tags=["Training"])
 
 
@@ -65,3 +67,25 @@ def submit_quiz_attempt(request: QuizSubmission, db: Session = Depends(get_db), 
 
     db.commit()
     return {"passed": passed, "score": round(score, 2)}
+
+
+
+@router.get("/system-overview")
+def training_system_overview(user=Depends(get_current_user)):
+    _ = user
+    return get_system_overview()
+
+
+@router.get("/workflow-guide")
+def training_workflow_guide(user=Depends(get_current_user)):
+    _ = user
+    return {"steps": get_workflow_guide()}
+
+
+@router.get("/step/{step_id}")
+def training_step(step_id: str, user=Depends(get_current_user)):
+    _ = user
+    step = get_guide_step(step_id)
+    if not step:
+        raise HTTPException(status_code=404, detail="Training step not found")
+    return step
