@@ -347,4 +347,4 @@ def _payload_uuid(payload: dict[str, Any], field: str) -> UUID:
     try:
         return UUID(str(value))
     except ValueError:
-        raise HTTPException(status_code=400, detail=f"{field} must be UUID"
+        raise HTTPException(status_code=400, detail=f"{field} must be UUID")
