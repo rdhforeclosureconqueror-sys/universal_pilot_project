@@ -252,9 +252,7 @@ class DomainServiceBroker:
         case_id = _payload_uuid(payload, "case_id")
         return calculate_benefit_value(db, case_id)
 
-    # ---------------------------------------------------
-    # Housing OS
-    # ---------------------------------------------------
+ # ---------------------------------------------------
 
     @staticmethod
     def _calculate_case_priority(db: Session, payload: dict[str, Any], *_):
@@ -281,7 +279,9 @@ class DomainServiceBroker:
         )
 
         acquisition_score = calculate_acquisition_score(
-            equity, ltv, payload.get("foreclosure_stage", "pre_foreclosure")
+            equity,
+            ltv,
+            payload.get("foreclosure_stage", "pre_foreclosure"),
         )
 
         return {
@@ -335,6 +335,10 @@ class DomainServiceBroker:
         return {"membership_profile_id": str(profile.id)}
 
 
+# ---------------------------------------------------
+# Utility
+# ---------------------------------------------------
+
 def _payload_uuid(payload: dict[str, Any], field: str) -> UUID:
 
     value = payload.get(field)
@@ -344,17 +348,19 @@ def _payload_uuid(payload: dict[str, Any], field: str) -> UUID:
 
     try:
         return UUID(str(value))
-
     except ValueError:
+        raise HTTPException(status_code=400, detail=f"{field} must be UUID")
 
-     raise HTTPException(status_code=400, detail=f"{field} must be UUID")
-        
+
+# ---------------------------------------------------
+# Module Startup Loader
+# ---------------------------------------------------
+
 def load_modules_on_startup(app: FastAPI) -> int:
     """
     Loads active modules during application startup.
     """
-    from app.services.module_loader_service import ModuleLoaderService
-    
+
     db = SessionLocal()
 
     try:
