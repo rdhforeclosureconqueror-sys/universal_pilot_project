@@ -353,6 +353,8 @@ def load_modules_on_startup(app: FastAPI) -> int:
     """
     Loads active modules during application startup.
     """
+    from app.services.module_loader_service import ModuleLoaderService
+    
     db = SessionLocal()
 
     try:
