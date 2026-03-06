@@ -232,7 +232,7 @@ class DomainServiceBroker:
     @staticmethod
     def _run_daily_risk_evaluation(db: Session, payload: dict[str, Any], *_):
         return run_daily_risk_evaluation(db)
-staticmethod
+    @staticmethod
     def _veteran_ai_advisory(db: Session, payload: dict[str, Any], *_):
         case_id = _payload_uuid(payload, "case_id")
         return get_advisory(
