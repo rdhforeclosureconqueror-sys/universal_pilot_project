@@ -1,21 +1,16 @@
 from __future__ import annotations
 
 from typing import Any, Callable
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from fastapi import HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.models.audit_logs import AuditLog
 from app.models.module_registry import ModuleRegistry
-from app.models.users import User
 
 from app.services.escalation_service import run_daily_risk_evaluation
-
-from app.services.foreclosure_intelligence_service import (
-    calculate_case_priority,
-)
+from app.services.foreclosure_intelligence_service import calculate_case_priority
 
 from app.services.property_analysis_service import (
     calculate_acquisition_score,
@@ -45,11 +40,6 @@ from app.services.veteran_intelligence_service import (
     upsert_veteran_profile,
 )
 
-from app.services.module_registry_service import ModuleRegistryService
-from auth.authorization import PolicyAuthorizer
-from auth.dependencies import get_current_user
-from db.session import SessionLocal, get_db
-
 
 # ---------------------------------------------------
 # Request Schema
@@ -65,7 +55,7 @@ class ModuleActionRequest(BaseModel):
 # ---------------------------------------------------
 
 class DomainServiceBroker:
-    """Bounded dispatcher for module actions using approved domain services only."""
+    """Dispatcher for module actions."""
 
     def __init__(self):
 
@@ -120,7 +110,7 @@ class DomainServiceBroker:
                 True,
             ),
 
-            # Housing Intelligence
+            # Housing
             "calculate_case_priority": (
                 "foreclosure_intelligence_service",
                 self._calculate_case_priority,
@@ -153,40 +143,6 @@ class DomainServiceBroker:
             ),
         }
 
-        self.allowed_services = {
-            "activation_service",
-            "admin_dashboard_service",
-            "ai_orchestration_service",
-            "application_service",
-            "auth_service",
-            "escalation_service",
-            "member_dashboard_service",
-            "membership_service",
-            "payment_service",
-            "qualification_service",
-            "stability_service",
-            "workflow_service",
-            "document_service",
-            "veteran_intelligence_service",
-            "foreclosure_intelligence_service",
-            "property_analysis_service",
-            "partner_routing_service",
-            "property_portfolio_service",
-        }
-
-    # ---------------------------------------------------
-    # Validation
-    # ---------------------------------------------------
-
-    def validate_required_services(self, required_services: list[str]):
-
-        unknown = sorted(set(required_services) - self.allowed_services)
-
-        if unknown:
-            return False, f"unknown required services: {', '.join(unknown)}"
-
-        return True, "required services are valid"
-
     # ---------------------------------------------------
     # Execution
     # ---------------------------------------------------
@@ -204,7 +160,7 @@ class DomainServiceBroker:
         if action_name not in (module.allowed_actions or []):
             raise HTTPException(
                 status_code=403,
-                detail=f"Action '{action_name}' not allowed for module",
+                detail=f"Action '{action_name}' not allowed",
             )
 
         mapped = self._handlers.get(action_name)
@@ -212,16 +168,10 @@ class DomainServiceBroker:
         if not mapped:
             raise HTTPException(
                 status_code=501,
-                detail=f"No safe domain-service mapping for action '{action_name}'",
+                detail=f"No mapping for action '{action_name}'",
             )
 
-        service_name, handler, requires_actor = mapped
-
-        if service_name not in (module.required_services or []):
-            raise HTTPException(
-                status_code=400,
-                detail=f"Action '{action_name}' requires service '{service_name}' declared in required_services",
-            )
+        _, handler, requires_actor = mapped
 
         return handler(db, payload, requires_actor, actor_id)
 
@@ -232,17 +182,49 @@ class DomainServiceBroker:
     @staticmethod
     def _run_daily_risk_evaluation(db: Session, payload: dict[str, Any], *_):
         return run_daily_risk_evaluation(db)
+
+    # ---------------------------------------------------
+    # Veteran Intelligence
+    # ---------------------------------------------------
+
+    @staticmethod
+    def _upsert_veteran_profile(db: Session, payload: dict[str, Any], _, actor_id):
+        profile = upsert_veteran_profile(db, actor_id=actor_id, payload=payload)
+        return {"case_id": str(profile.case_id)}
+
+    @staticmethod
+    def _scan_veteran_benefits(db: Session, payload: dict[str, Any], *_):
+        return match_benefits(db, case_id=_payload_uuid(payload, "case_id"))
+
+    @staticmethod
+    def _generate_veteran_action_plan(db: Session, payload: dict[str, Any], *_):
+        return generate_action_plan(db, case_id=_payload_uuid(payload, "case_id"))
+
+    @staticmethod
+    def _generate_veteran_documents(db: Session, payload: dict[str, Any], _, actor_id):
+        return generate_documents(db, case_id=_payload_uuid(payload, "case_id"), actor_id=actor_id)
+
+    @staticmethod
+    def _update_benefit_progress(db: Session, payload: dict[str, Any], *_):
+        return update_benefit_progress(
+            db,
+            case_id=_payload_uuid(payload, "case_id"),
+            benefit_name=payload.get("benefit_name"),
+            status=payload.get("status"),
+        )
+
     @staticmethod
     def _veteran_ai_advisory(db: Session, payload: dict[str, Any], *_):
-        case_id = _payload_uuid(payload, "case_id")
+
         return get_advisory(
             db,
-            case_id=case_id,
+            case_id=_payload_uuid(payload, "case_id"),
             question=payload.get("question", ""),
         )
 
     @staticmethod
     def _veteran_partner_aggregate_report(db: Session, payload: dict[str, Any], *_):
+
         return {
             "rows": partner_aggregate_report(
                 db,
@@ -252,17 +234,23 @@ class DomainServiceBroker:
 
     @staticmethod
     def _calculate_veteran_benefit_value(db: Session, payload: dict[str, Any], *_):
-        case_id = _payload_uuid(payload, "case_id")
-        return calculate_benefit_value(db, case_id=case_id)
+
+        return calculate_benefit_value(
+            db,
+            case_id=_payload_uuid(payload, "case_id"),
+        )
 
     # ---------------------------------------------------
-    # Housing OS
+    # Housing Intelligence
     # ---------------------------------------------------
 
     @staticmethod
     def _calculate_case_priority(db: Session, payload: dict[str, Any], *_):
-        case_id = _payload_uuid(payload, "case_id")
-        return calculate_case_priority(db, case_id=case_id)
+
+        return calculate_case_priority(
+            db,
+            case_id=_payload_uuid(payload, "case_id"),
+        )
 
     @staticmethod
     def _analyze_property(db: Session, payload: dict[str, Any], *_):
@@ -271,28 +259,21 @@ class DomainServiceBroker:
         loan_balance = float(payload.get("loan_balance", 0))
         arrears = float(payload.get("arrears_amount", 0))
         income = float(payload.get("homeowner_income", 0))
-        stage = str(payload.get("foreclosure_stage", "pre_foreclosure"))
+        stage = payload.get("foreclosure_stage", "pre_foreclosure")
 
-        equity = calculate_equity(
-            estimated_property_value=estimated_value,
-            loan_balance=loan_balance,
-        )
-
-        ltv = calculate_ltv(
-            loan_balance=loan_balance,
-            estimated_property_value=estimated_value,
-        )
+        equity = calculate_equity(estimated_value, loan_balance)
+        ltv = calculate_ltv(loan_balance, estimated_value)
 
         rescue_score = calculate_rescue_score(
-            arrears_amount=arrears,
-            homeowner_income=income,
-            foreclosure_stage=stage,
+            arrears,
+            income,
+            stage,
         )
 
         acquisition_score = calculate_acquisition_score(
-            equity=equity,
-            ltv=ltv,
-            foreclosure_stage=stage,
+            equity,
+            ltv,
+            stage,
         )
 
         classification = classify_intervention(
@@ -310,23 +291,20 @@ class DomainServiceBroker:
         }
 
     @staticmethod
-    def _route_case_partner(db: Session, payload: dict[str, Any], _, actor_id: UUID | None):
+    def _route_case_partner(db: Session, payload: dict[str, Any], _, actor_id):
 
         referral = route_case_to_partner(
             db,
             case_id=_payload_uuid(payload, "case_id"),
-            state=str(payload.get("state", "")),
-            routing_category=str(payload.get("routing_category", "nonprofit_support")),
+            state=payload.get("state"),
+            routing_category=payload.get("routing_category"),
             actor_id=actor_id,
         )
 
-        return {
-            "partner_referral_id": str(referral.id),
-            "status": referral.status,
-        }
+        return {"partner_referral_id": str(referral.id)}
 
     @staticmethod
-    def _add_property_to_portfolio(db: Session, payload: dict[str, Any], _, actor_id: UUID | None):
+    def _add_property_to_portfolio(db: Session, payload: dict[str, Any], _, actor_id):
 
         asset = add_property_to_portfolio(
             db,
@@ -338,18 +316,35 @@ class DomainServiceBroker:
 
     @staticmethod
     def _portfolio_summary(db: Session, payload: dict[str, Any], *_):
-        del payload
+
         return calculate_portfolio_equity(db)
 
     @staticmethod
-    def _create_membership_profile(db: Session, payload: dict[str, Any], _, actor_id: UUID | None):
+    def _create_membership_profile(db: Session, payload: dict[str, Any], _, actor_id):
 
         profile = create_membership(
             db,
             user_id=_payload_uuid(payload, "user_id"),
             case_id=_payload_uuid(payload, "case_id"),
-            membership_type=str(payload.get("membership_type", "cooperative")),
+            membership_type=payload.get("membership_type", "cooperative"),
             actor_id=actor_id,
         )
 
         return {"membership_profile_id": str(profile.id)}
+
+
+# ---------------------------------------------------
+# Utility
+# ---------------------------------------------------
+
+def _payload_uuid(payload: dict[str, Any], field: str) -> UUID:
+
+    value = payload.get(field)
+
+    if not value:
+        raise HTTPException(status_code=400, detail=f"{field} required")
+
+    try:
+        return UUID(str(value))
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"{field} must be UUID"
