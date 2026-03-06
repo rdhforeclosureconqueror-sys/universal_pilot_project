@@ -346,4 +346,18 @@ def _payload_uuid(payload: dict[str, Any], field: str) -> UUID:
         return UUID(str(value))
 
     except ValueError:
-        raise HTTPException(status_code=400, detail=f"{field} must be UUID")
+
+     raise HTTPException(status_code=400, detail=f"{field} must be UUID")
+        
+def load_modules_on_startup(app: FastAPI) -> int:
+    """
+    Loads active modules during application startup.
+    """
+    db = SessionLocal()
+
+    try:
+        loader = ModuleLoaderService(app, db)
+        return loader.load_active_modules()
+
+    finally:
+        db.close()
