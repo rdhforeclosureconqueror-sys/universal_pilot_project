@@ -13,6 +13,9 @@ from app.models.module_registry import ModuleRegistry
 from app.models.users import User
 from app.services.escalation_service import run_daily_risk_evaluation
 from app.services.foreclosure_intelligence_service import calculate_case_priority
+from app.services.membership_service import create_membership
+from app.services.module_registry_service import ModuleRegistryService
+from app.services.partner_routing_service import route_case_to_partner
 from app.services.property_analysis_service import (
     calculate_acquisition_score,
     calculate_equity,
@@ -20,9 +23,10 @@ from app.services.property_analysis_service import (
     calculate_rescue_score,
     classify_intervention,
 )
-from app.services.partner_routing_service import route_case_to_partner
-from app.services.property_portfolio_service import add_property_to_portfolio, calculate_portfolio_equity
-from app.services.membership_service import create_membership
+from app.services.property_portfolio_service import (
+    add_property_to_portfolio,
+    calculate_portfolio_equity,
+)
 from app.services.veteran_intelligence_service import (
     calculate_benefit_value,
     generate_action_plan,
@@ -33,7 +37,6 @@ from app.services.veteran_intelligence_service import (
     update_benefit_progress,
     upsert_veteran_profile,
 )
-from app.services.module_registry_service import ModuleRegistryService
 from auth.authorization import PolicyAuthorizer
 from auth.dependencies import get_current_user
 from db.session import SessionLocal, get_db
@@ -42,6 +45,16 @@ from db.session import SessionLocal, get_db
 class ModuleActionRequest(BaseModel):
     case_id: str | None = None
     payload: dict[str, Any] = Field(default_factory=dict)
+
+
+def _payload_uuid(payload: dict[str, Any], key: str) -> UUID:
+    value = payload.get(key)
+    if not value:
+        raise HTTPException(status_code=400, detail=f"'{key}' is required")
+    try:
+        return UUID(str(value))
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=400, detail=f"'{key}' must be a UUID") from exc
 
 
 class DomainServiceBroker:
@@ -69,6 +82,7 @@ class DomainServiceBroker:
             "portfolio_summary": ("property_portfolio_service", self._portfolio_summary, True),
             "create_membership_profile": ("membership_service", self._create_membership_profile, True),
         }
+
         self.allowed_services = {
             "activation_service",
             "admin_dashboard_service",
@@ -88,7 +102,6 @@ class DomainServiceBroker:
             "property_analysis_service",
             "partner_routing_service",
             "property_portfolio_service",
-            "membership_service",
         }
 
     def validate_required_services(self, required_services: list[str]) -> tuple[bool, str]:
@@ -237,6 +250,7 @@ class DomainServiceBroker:
         _requires_actor: bool,
         _actor_id: UUID | None,
     ) -> dict[str, Any]:
+        del db
         equity = calculate_equity(
             estimated_property_value=float(payload.get("estimated_property_value", 0)),
             loan_balance=float(payload.get("loan_balance", 0)),
@@ -260,7 +274,11 @@ class DomainServiceBroker:
             "ltv": ltv,
             "rescue_score": rescue_score,
             "acquisition_score": acquisition_score,
-            "classification": classify_intervention(rescue_score=rescue_score, acquisition_score=acquisition_score, ltv=ltv),
+            "classification": classify_intervention(
+                rescue_score=rescue_score,
+                acquisition_score=acquisition_score,
+                ltv=ltv,
+            ),
         }
 
     @staticmethod
@@ -306,6 +324,8 @@ class DomainServiceBroker:
         _requires_actor: bool,
         actor_id: UUID | None,
     ) -> dict[str, Any]:
+        membership = create_membership(db, payload=payload, actor_id=actor_id)
+        return {"membership_id": str(membership.id)}
         profile = create_membership(
             db,
             user_id=_payload_uuid(payload, "user_id"),

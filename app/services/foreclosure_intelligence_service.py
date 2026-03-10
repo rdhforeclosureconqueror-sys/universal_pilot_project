@@ -34,14 +34,15 @@ def create_foreclosure_profile(db: Session, *, case_id: UUID | None, payload: di
     return {"case_id": resolved_case_id, "profile_created": True, "profile_id": profile.id}
 
 
-def update_foreclosure_status(db: Session, *, case_id: UUID, foreclosure_stage: str, actor_id: UUID | None) -> ForeclosureCaseData:
+def update_foreclosure_status(
+    db: Session, *, case_id: UUID, foreclosure_stage: str, actor_id: UUID | None
+) -> ForeclosureCaseData:
     profile = db.query(ForeclosureCaseData).filter(ForeclosureCaseData.case_id == case_id).first()
     if not profile:
         raise HTTPException(status_code=404, detail="Foreclosure profile not found")
 
     before = profile.foreclosure_stage
     profile.foreclosure_stage = foreclosure_stage
-
     db.flush()
 
     _audit(
@@ -52,7 +53,6 @@ def update_foreclosure_status(db: Session, *, case_id: UUID, foreclosure_stage: 
         reason_code="foreclosure_stage_updated",
         after_state={"before_stage": before, "after_stage": foreclosure_stage},
     )
-
     return profile
 
 
@@ -62,7 +62,12 @@ def calculate_case_priority(db: Session, *, case_id: UUID) -> dict:
         raise HTTPException(status_code=404, detail="Foreclosure profile not found")
 
     stage = (profile.foreclosure_stage or "").lower()
-    stage_weight = {"pre_foreclosure": 15, "notice_of_default": 30, "auction_scheduled": 50, "post_sale": 80}.get(stage, 10)
+    stage_weight = {
+        "pre_foreclosure": 15,
+        "notice_of_default": 30,
+        "auction_scheduled": 50,
+        "post_sale": 80,
+    }.get(stage, 10)
     arrears = float(profile.arrears_amount or 0)
     income = float(profile.homeowner_income or 0)
     pressure = 0 if income <= 0 else min(40, (arrears / max(income, 1)) * 10)
@@ -79,7 +84,15 @@ def calculate_case_priority(db: Session, *, case_id: UUID) -> dict:
     return {"case_id": str(case_id), "priority_score": round(score, 2), "priority_tier": tier}
 
 
-def _audit(db: Session, *, actor_id: UUID | None, case_id: UUID, action_type: str, reason_code: str, after_state: dict) -> None:
+def _audit(
+    db: Session,
+    *,
+    actor_id: UUID | None,
+    case_id: UUID,
+    action_type: str,
+    reason_code: str,
+    after_state: dict,
+) -> None:
     db.add(
         AuditLog(
             id=uuid4(),
@@ -119,7 +132,6 @@ def _auto_create_case(db: Session, *, actor_id: UUID | None, payload: dict) -> U
         },
         policy_version_id=policy.id,
     )
-
     db.add(case)
     db.flush()
 
