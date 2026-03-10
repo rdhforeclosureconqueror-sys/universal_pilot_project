@@ -15,6 +15,9 @@ from ai.voice_interface import synthesize_audio, transcribe_audio
 from app.models.audit_logs import AuditLog
 from app.models.users import User
 from internal.ai_gateway import execute_gateway_action
+from app.services.veteran_intelligence_service import get_advisory
+import re
+from uuid import UUID
 
 
 def _state_hash(payload: dict) -> str:
@@ -25,7 +28,20 @@ def _state_hash(payload: dict) -> str:
 def advisory_message(db: Session, message: str) -> dict:
     parsed = parse_command(message)
     context = build_context(db)
-    response = build_advisory(message, parsed, context)
+
+    if parsed.intent == "veteran_benefit_advisory":
+        case_match = re.search(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}", message)
+        if case_match:
+            try:
+                advisory = get_advisory(db, case_id=UUID(case_match.group(0)), question=message)
+                response = advisory["answer"]
+            except Exception:
+                response = "Veteran advisory is available. Please provide a valid case UUID tied to a veteran profile for precise eligibility results."
+        else:
+            response = "To answer veteran eligibility questions precisely, include the case UUID linked to the veteran profile."
+    else:
+        response = build_advisory(message, parsed, context)
+
     return {
         "advisory_response": response,
         "execution_request": parsed.execution_request,

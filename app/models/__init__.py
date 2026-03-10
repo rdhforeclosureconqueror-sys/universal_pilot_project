@@ -54,3 +54,13 @@ from .member_layer import (
 )
 
 from .system_verification import SystemPhase, PhaseVerificationRun
+
+from .module_registry import ModuleRegistry
+
+from .veteran_intelligence import VeteranProfile, BenefitRegistry, BenefitProgress, BenefitDiscoveryAggregate
+
+from .housing_intelligence import ForeclosureCaseData, PartnerOrganization, PartnerReferral, PropertyAsset, MembershipProfile, ForeclosureLeadImport, TrainingGuideStep
+
+from .essential_worker import EssentialWorkerProfile, EssentialWorkerBenefitMatch
+
+from .lead_intelligence import LeadSource, PropertyLead, LeadScore
