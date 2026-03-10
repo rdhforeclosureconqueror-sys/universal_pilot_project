@@ -36,6 +36,8 @@ from api.routes import (
     membership,
     pipeline,
     verify,
+    essential_worker,
+    lead_intelligence,
 )
 
 # -----------------------------------------------------
@@ -111,6 +113,8 @@ app.include_router(portfolio.router)
 app.include_router(membership.router)
 app.include_router(pipeline.router)
 app.include_router(verify.router)
+app.include_router(essential_worker.router)
+app.include_router(lead_intelligence.router)
 
 app.include_router(public_apply.router)
 app.include_router(system_admin.router)
