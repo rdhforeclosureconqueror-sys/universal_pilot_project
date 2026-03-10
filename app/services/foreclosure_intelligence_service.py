@@ -23,7 +23,14 @@ def create_foreclosure_profile(db: Session, *, case_id: UUID | None, payload: di
     db.add(profile)
     db.flush()
 
-    _audit(db, actor_id=actor_id, case_id=resolved_case_id, action_type="foreclosure_profile_created", reason_code="foreclosure_profile_created", after_state={"profile_id": str(profile.id)})
+    _audit(
+        db,
+        actor_id=actor_id,
+        case_id=resolved_case_id,
+        action_type="foreclosure_profile_created",
+        reason_code="foreclosure_profile_created",
+        after_state={"profile_id": str(profile.id)},
+    )
     return {"case_id": resolved_case_id, "profile_created": True, "profile_id": profile.id}
 
 
@@ -34,6 +41,7 @@ def update_foreclosure_status(db: Session, *, case_id: UUID, foreclosure_stage: 
 
     before = profile.foreclosure_stage
     profile.foreclosure_stage = foreclosure_stage
+
     db.flush()
 
     _audit(
@@ -44,6 +52,7 @@ def update_foreclosure_status(db: Session, *, case_id: UUID, foreclosure_stage: 
         reason_code="foreclosure_stage_updated",
         after_state={"before_stage": before, "after_stage": foreclosure_stage},
     )
+
     return profile
 
 
@@ -57,6 +66,7 @@ def calculate_case_priority(db: Session, *, case_id: UUID) -> dict:
     arrears = float(profile.arrears_amount or 0)
     income = float(profile.homeowner_income or 0)
     pressure = 0 if income <= 0 else min(40, (arrears / max(income, 1)) * 10)
+
     score = min(100, stage_weight + pressure)
 
     if score >= 70:
@@ -86,7 +96,12 @@ def _audit(db: Session, *, actor_id: UUID | None, case_id: UUID, action_type: st
 
 
 def _auto_create_case(db: Session, *, actor_id: UUID | None, payload: dict) -> UUID:
-    policy = db.query(PolicyVersion).filter(PolicyVersion.is_active.is_(True)).order_by(PolicyVersion.created_at.desc()).first()
+    policy = (
+        db.query(PolicyVersion)
+        .filter(PolicyVersion.is_active.is_(True))
+        .order_by(PolicyVersion.created_at.desc())
+        .first()
+    )
     if not policy:
         raise HTTPException(status_code=400, detail="No active policy available to initialize case")
 
@@ -104,6 +119,7 @@ def _auto_create_case(db: Session, *, actor_id: UUID | None, payload: dict) -> U
         },
         policy_version_id=policy.id,
     )
+
     db.add(case)
     db.flush()
 
@@ -115,4 +131,5 @@ def _auto_create_case(db: Session, *, actor_id: UUID | None, payload: dict) -> U
         reason_code="auto_case_initialized",
         after_state={"program_key": policy.program_key},
     )
+
     return case.id

@@ -1,3 +1,4 @@
+# app/services/module_loader_service.py
 from __future__ import annotations
 
 from typing import Any, Callable
@@ -12,7 +13,13 @@ from app.models.module_registry import ModuleRegistry
 from app.models.users import User
 from app.services.escalation_service import run_daily_risk_evaluation
 from app.services.foreclosure_intelligence_service import calculate_case_priority
-from app.services.property_analysis_service import calculate_acquisition_score, calculate_equity, calculate_ltv, calculate_rescue_score, classify_intervention
+from app.services.property_analysis_service import (
+    calculate_acquisition_score,
+    calculate_equity,
+    calculate_ltv,
+    calculate_rescue_score,
+    classify_intervention,
+)
 from app.services.partner_routing_service import route_case_to_partner
 from app.services.property_portfolio_service import add_property_to_portfolio, calculate_portfolio_equity
 from app.services.membership_service import create_membership
@@ -40,8 +47,8 @@ class ModuleActionRequest(BaseModel):
 class DomainServiceBroker:
     """Bounded dispatcher for module actions using existing domain services only."""
 
-    def __init__(self):
-        self._handlers: dict[str, tuple[str, Callable[[Session, dict[str, Any]], dict[str, Any], bool]]] = {
+    def __init__(self) -> None:
+        self._handlers: dict[str, tuple[str, Callable[..., dict[str, Any]], bool]] = {
             "run_daily_risk_evaluation": ("escalation_service", self._run_daily_risk_evaluation, False),
             "upsert_veteran_profile": ("veteran_intelligence_service", self._upsert_veteran_profile, True),
             "scan_veteran_benefits": ("veteran_intelligence_service", self._scan_veteran_benefits, True),
@@ -49,7 +56,11 @@ class DomainServiceBroker:
             "generate_veteran_documents": ("document_service", self._generate_veteran_documents, True),
             "update_benefit_progress": ("veteran_intelligence_service", self._update_benefit_progress, True),
             "veteran_ai_advisory": ("veteran_intelligence_service", self._veteran_ai_advisory, True),
-            "veteran_partner_aggregate_report": ("veteran_intelligence_service", self._veteran_partner_aggregate_report, False),
+            "veteran_partner_aggregate_report": (
+                "veteran_intelligence_service",
+                self._veteran_partner_aggregate_report,
+                False,
+            ),
             "calculate_veteran_benefit_value": ("veteran_intelligence_service", self._calculate_veteran_benefit_value, True),
             "calculate_case_priority": ("foreclosure_intelligence_service", self._calculate_case_priority, True),
             "analyze_property": ("property_analysis_service", self._analyze_property, True),
@@ -86,7 +97,15 @@ class DomainServiceBroker:
             return False, f"unknown required services: {', '.join(unknown)}"
         return True, "required services are valid"
 
-    def execute_action(self, db: Session, *, module: ModuleRegistry, action_name: str, payload: dict[str, Any], actor_id: UUID | None = None) -> dict[str, Any]:
+    def execute_action(
+        self,
+        db: Session,
+        *,
+        module: ModuleRegistry,
+        action_name: str,
+        payload: dict[str, Any],
+        actor_id: UUID | None = None,
+    ) -> dict[str, Any]:
         if action_name not in (module.allowed_actions or []):
             raise HTTPException(status_code=403, detail=f"Action '{action_name}' not allowed for module")
 
@@ -104,34 +123,64 @@ class DomainServiceBroker:
         return handler(db, payload, requires_actor and actor_id is not None, actor_id)
 
     @staticmethod
-    def _run_daily_risk_evaluation(db: Session, payload: dict[str, Any], _requires_actor: bool, _actor_id: UUID | None) -> dict[str, Any]:
+    def _run_daily_risk_evaluation(
+        db: Session,
+        payload: dict[str, Any],
+        _requires_actor: bool,
+        _actor_id: UUID | None,
+    ) -> dict[str, Any]:
         del payload
         return run_daily_risk_evaluation(db)
 
     @staticmethod
-    def _upsert_veteran_profile(db: Session, payload: dict[str, Any], _requires_actor: bool, actor_id: UUID | None) -> dict[str, Any]:
+    def _upsert_veteran_profile(
+        db: Session,
+        payload: dict[str, Any],
+        _requires_actor: bool,
+        actor_id: UUID | None,
+    ) -> dict[str, Any]:
         profile = upsert_veteran_profile(db, actor_id=actor_id, payload=payload)
         return {"case_id": str(profile.case_id), "disability_rating": profile.disability_rating}
 
     @staticmethod
-    def _scan_veteran_benefits(db: Session, payload: dict[str, Any], _requires_actor: bool, _actor_id: UUID | None) -> dict[str, Any]:
+    def _scan_veteran_benefits(
+        db: Session,
+        payload: dict[str, Any],
+        _requires_actor: bool,
+        _actor_id: UUID | None,
+    ) -> dict[str, Any]:
         case_id = _payload_uuid(payload, "case_id")
         return match_benefits(db, case_id=case_id)
 
     @staticmethod
-    def _generate_veteran_action_plan(db: Session, payload: dict[str, Any], _requires_actor: bool, _actor_id: UUID | None) -> dict[str, Any]:
+    def _generate_veteran_action_plan(
+        db: Session,
+        payload: dict[str, Any],
+        _requires_actor: bool,
+        _actor_id: UUID | None,
+    ) -> dict[str, Any]:
         case_id = _payload_uuid(payload, "case_id")
         return generate_action_plan(db, case_id=case_id)
 
     @staticmethod
-    def _generate_veteran_documents(db: Session, payload: dict[str, Any], requires_actor: bool, actor_id: UUID | None) -> dict[str, Any]:
+    def _generate_veteran_documents(
+        db: Session,
+        payload: dict[str, Any],
+        requires_actor: bool,
+        actor_id: UUID | None,
+    ) -> dict[str, Any]:
         if requires_actor and actor_id is None:
             raise HTTPException(status_code=400, detail="actor_id required")
         case_id = _payload_uuid(payload, "case_id")
         return generate_documents(db, case_id=case_id, actor_id=actor_id)
 
     @staticmethod
-    def _update_benefit_progress(db: Session, payload: dict[str, Any], _requires_actor: bool, actor_id: UUID | None) -> dict[str, Any]:
+    def _update_benefit_progress(
+        db: Session,
+        payload: dict[str, Any],
+        _requires_actor: bool,
+        actor_id: UUID | None,
+    ) -> dict[str, Any]:
         case_id = _payload_uuid(payload, "case_id")
         return update_benefit_progress(
             db,
@@ -143,34 +192,69 @@ class DomainServiceBroker:
         )
 
     @staticmethod
-    def _veteran_ai_advisory(db: Session, payload: dict[str, Any], _requires_actor: bool, _actor_id: UUID | None) -> dict[str, Any]:
+    def _veteran_ai_advisory(
+        db: Session,
+        payload: dict[str, Any],
+        _requires_actor: bool,
+        _actor_id: UUID | None,
+    ) -> dict[str, Any]:
         case_id = _payload_uuid(payload, "case_id")
         return get_advisory(db, case_id=case_id, question=payload.get("question", ""))
 
     @staticmethod
-    def _veteran_partner_aggregate_report(db: Session, payload: dict[str, Any], _requires_actor: bool, _actor_id: UUID | None) -> dict[str, Any]:
+    def _veteran_partner_aggregate_report(
+        db: Session,
+        payload: dict[str, Any],
+        _requires_actor: bool,
+        _actor_id: UUID | None,
+    ) -> dict[str, Any]:
         return {"rows": partner_aggregate_report(db, state_of_residence=payload.get("state_of_residence"))}
 
     @staticmethod
-    def _calculate_veteran_benefit_value(db: Session, payload: dict[str, Any], _requires_actor: bool, _actor_id: UUID | None) -> dict[str, Any]:
+    def _calculate_veteran_benefit_value(
+        db: Session,
+        payload: dict[str, Any],
+        _requires_actor: bool,
+        _actor_id: UUID | None,
+    ) -> dict[str, Any]:
         case_id = _payload_uuid(payload, "case_id")
         return calculate_benefit_value(db, case_id=case_id)
 
     @staticmethod
-    def _calculate_case_priority(db: Session, payload: dict[str, Any], _requires_actor: bool, _actor_id: UUID | None) -> dict[str, Any]:
+    def _calculate_case_priority(
+        db: Session,
+        payload: dict[str, Any],
+        _requires_actor: bool,
+        _actor_id: UUID | None,
+    ) -> dict[str, Any]:
         case_id = _payload_uuid(payload, "case_id")
         return calculate_case_priority(db, case_id=case_id)
 
     @staticmethod
-    def _analyze_property(db: Session, payload: dict[str, Any], _requires_actor: bool, _actor_id: UUID | None) -> dict[str, Any]:
-        equity = calculate_equity(estimated_property_value=float(payload.get("estimated_property_value", 0)), loan_balance=float(payload.get("loan_balance", 0)))
-        ltv = calculate_ltv(loan_balance=float(payload.get("loan_balance", 0)), estimated_property_value=float(payload.get("estimated_property_value", 0)))
+    def _analyze_property(
+        db: Session,
+        payload: dict[str, Any],
+        _requires_actor: bool,
+        _actor_id: UUID | None,
+    ) -> dict[str, Any]:
+        equity = calculate_equity(
+            estimated_property_value=float(payload.get("estimated_property_value", 0)),
+            loan_balance=float(payload.get("loan_balance", 0)),
+        )
+        ltv = calculate_ltv(
+            loan_balance=float(payload.get("loan_balance", 0)),
+            estimated_property_value=float(payload.get("estimated_property_value", 0)),
+        )
         rescue_score = calculate_rescue_score(
             arrears_amount=float(payload.get("arrears_amount", 0)),
             homeowner_income=float(payload.get("homeowner_income", 0)),
             foreclosure_stage=str(payload.get("foreclosure_stage", "pre_foreclosure")),
         )
-        acquisition_score = calculate_acquisition_score(equity=equity, ltv=ltv, foreclosure_stage=str(payload.get("foreclosure_stage", "pre_foreclosure")))
+        acquisition_score = calculate_acquisition_score(
+            equity=equity,
+            ltv=ltv,
+            foreclosure_stage=str(payload.get("foreclosure_stage", "pre_foreclosure")),
+        )
         return {
             "equity": equity,
             "ltv": ltv,
@@ -180,7 +264,12 @@ class DomainServiceBroker:
         }
 
     @staticmethod
-    def _route_case_partner(db: Session, payload: dict[str, Any], _requires_actor: bool, actor_id: UUID | None) -> dict[str, Any]:
+    def _route_case_partner(
+        db: Session,
+        payload: dict[str, Any],
+        _requires_actor: bool,
+        actor_id: UUID | None,
+    ) -> dict[str, Any]:
         referral = route_case_to_partner(
             db,
             case_id=_payload_uuid(payload, "case_id"),
@@ -191,17 +280,32 @@ class DomainServiceBroker:
         return {"partner_referral_id": str(referral.id), "status": referral.status}
 
     @staticmethod
-    def _add_property_to_portfolio(db: Session, payload: dict[str, Any], _requires_actor: bool, actor_id: UUID | None) -> dict[str, Any]:
+    def _add_property_to_portfolio(
+        db: Session,
+        payload: dict[str, Any],
+        _requires_actor: bool,
+        actor_id: UUID | None,
+    ) -> dict[str, Any]:
         asset = add_property_to_portfolio(db, payload=payload, actor_id=actor_id)
         return {"property_asset_id": str(asset.id)}
 
     @staticmethod
-    def _portfolio_summary(db: Session, payload: dict[str, Any], _requires_actor: bool, _actor_id: UUID | None) -> dict[str, Any]:
+    def _portfolio_summary(
+        db: Session,
+        payload: dict[str, Any],
+        _requires_actor: bool,
+        _actor_id: UUID | None,
+    ) -> dict[str, Any]:
         del payload
         return calculate_portfolio_equity(db)
 
     @staticmethod
-    def _create_membership_profile(db: Session, payload: dict[str, Any], _requires_actor: bool, actor_id: UUID | None) -> dict[str, Any]:
+    def _create_membership_profile(
+        db: Session,
+        payload: dict[str, Any],
+        _requires_actor: bool,
+        actor_id: UUID | None,
+    ) -> dict[str, Any]:
         profile = create_membership(
             db,
             user_id=_payload_uuid(payload, "user_id"),
