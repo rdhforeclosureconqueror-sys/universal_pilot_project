@@ -1,0 +1,39 @@
+{
+  "module_name": "veteran_intelligence_platform",
+  "module_type": "eligibility_engine",
+  "version": "1.0.0",
+  "permissions": [
+    "cases.read",
+    "documents.write",
+    "partner_api.read",
+    "workflow.execute"
+  ],
+  "required_services": [
+    "veteran_intelligence_service",
+    "document_service",
+    "workflow_service"
+  ],
+  "data_schema": {
+    "inputs": {
+      "case_id": "uuid",
+      "veteran_profile": "object",
+      "question": "string"
+    },
+    "outputs": {
+      "eligible_benefits": "array",
+      "estimated_total_value": "number",
+      "priority_order": "array",
+      "action_plan": "array"
+    }
+  },
+  "allowed_actions": [
+    "upsert_veteran_profile",
+    "scan_veteran_benefits",
+    "generate_veteran_action_plan",
+    "generate_veteran_documents",
+    "update_benefit_progress",
+    "veteran_ai_advisory",
+    "veteran_partner_aggregate_report",
+    "calculate_veteran_benefit_value"
+  ]
+}
