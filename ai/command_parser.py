@@ -29,6 +29,13 @@ def parse_command(message: str) -> ParsedCommand:
             execution_request=True,
             params={"phase_key": "phase7_ai_orchestration"},
         )
+    if any(k in text for k in ["veteran benefit", "benefits do i qualify", "va loan", "stop foreclosure", "veteran"]):
+        return ParsedCommand(
+            intent="veteran_benefit_advisory",
+            required_role=AIRole.READ,
+            execution_request=False,
+            params={},
+        )
     if any(k in text for k in ["migration", "schema change", "alter table"]):
         return ParsedCommand(
             intent="structure_plan",
