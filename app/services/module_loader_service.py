@@ -74,7 +74,11 @@ class DomainServiceBroker:
                 self._veteran_partner_aggregate_report,
                 False,
             ),
-            "calculate_veteran_benefit_value": ("veteran_intelligence_service", self._calculate_veteran_benefit_value, True),
+            "calculate_veteran_benefit_value": (
+                "veteran_intelligence_service",
+                self._calculate_veteran_benefit_value,
+                True,
+            ),
             "calculate_case_priority": ("foreclosure_intelligence_service", self._calculate_case_priority, True),
             "analyze_property": ("property_analysis_service", self._analyze_property, True),
             "route_case_partner": ("partner_routing_service", self._route_case_partner, True),
@@ -324,8 +328,6 @@ class DomainServiceBroker:
         _requires_actor: bool,
         actor_id: UUID | None,
     ) -> dict[str, Any]:
-        membership = create_membership(db, payload=payload, actor_id=actor_id)
-        return {"membership_id": str(membership.id)}
         profile = create_membership(
             db,
             user_id=_payload_uuid(payload, "user_id"),
@@ -493,13 +495,3 @@ def load_modules_on_startup(app: FastAPI) -> int:
         return ModuleLoaderService(app, db).load_active_modules()
     finally:
         db.close()
-
-
-def _payload_uuid(payload: dict[str, Any], field: str) -> UUID:
-    value = payload.get(field)
-    if not value:
-        raise HTTPException(status_code=400, detail=f"{field} is required")
-    try:
-        return UUID(str(value))
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=f"{field} must be a valid UUID") from exc
