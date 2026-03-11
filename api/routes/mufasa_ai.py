@@ -50,4 +50,4 @@ def mufasa_explain(
         investor_mode=request.investor_mode,
     )
 
-    return {"explanation": explanation}
+    return MufasaExplainResponse(explanation=explanation)
