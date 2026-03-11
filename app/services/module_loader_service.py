@@ -37,6 +37,7 @@ from app.services.veteran_intelligence_service import (
     update_benefit_progress,
     upsert_veteran_profile,
 )
+
 from auth.authorization import PolicyAuthorizer
 from auth.dependencies import get_current_user
 from db.session import SessionLocal, get_db
@@ -53,7 +54,7 @@ def _payload_uuid(payload: dict[str, Any], key: str) -> UUID:
         raise HTTPException(status_code=400, detail=f"'{key}' is required")
     try:
         return UUID(str(value))
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         raise HTTPException(status_code=400, detail=f"'{key}' must be a UUID") from exc
 
 
@@ -123,6 +124,7 @@ class DomainServiceBroker:
         payload: dict[str, Any],
         actor_id: UUID | None = None,
     ) -> dict[str, Any]:
+
         if action_name not in (module.allowed_actions or []):
             raise HTTPException(status_code=403, detail=f"Action '{action_name}' not allowed for module")
 
@@ -131,6 +133,7 @@ class DomainServiceBroker:
             raise HTTPException(status_code=501, detail=f"No safe domain-service mapping for action '{action_name}'")
 
         service_name, handler, requires_actor = mapped
+
         if service_name not in (module.required_services or []):
             raise HTTPException(
                 status_code=400,
@@ -186,10 +189,17 @@ class DomainServiceBroker:
         requires_actor: bool,
         actor_id: UUID | None,
     ) -> dict[str, Any]:
+
         if requires_actor and actor_id is None:
             raise HTTPException(status_code=400, detail="actor_id required")
+
         case_id = _payload_uuid(payload, "case_id")
-        return generate_documents(db, case_id=case_id, actor_id=actor_id)
+
+        return generate_documents(
+            db,
+            case_id=case_id,
+            actor_id=actor_id,
+        )
 
     @staticmethod
     def _update_benefit_progress(
@@ -198,7 +208,9 @@ class DomainServiceBroker:
         _requires_actor: bool,
         actor_id: UUID | None,
     ) -> dict[str, Any]:
+
         case_id = _payload_uuid(payload, "case_id")
+
         return update_benefit_progress(
             db,
             case_id=case_id,
@@ -215,8 +227,14 @@ class DomainServiceBroker:
         _requires_actor: bool,
         _actor_id: UUID | None,
     ) -> dict[str, Any]:
+
         case_id = _payload_uuid(payload, "case_id")
-        return get_advisory(db, case_id=case_id, question=payload.get("question", ""))
+
+        return get_advisory(
+            db,
+            case_id=case_id,
+            question=payload.get("question", ""),
+        )
 
     @staticmethod
     def _veteran_partner_aggregate_report(
@@ -225,7 +243,13 @@ class DomainServiceBroker:
         _requires_actor: bool,
         _actor_id: UUID | None,
     ) -> dict[str, Any]:
-        return {"rows": partner_aggregate_report(db, state_of_residence=payload.get("state_of_residence"))}
+
+        return {
+            "rows": partner_aggregate_report(
+                db,
+                state_of_residence=payload.get("state_of_residence"),
+            )
+        }
 
     @staticmethod
     def _calculate_veteran_benefit_value(
@@ -234,8 +258,13 @@ class DomainServiceBroker:
         _requires_actor: bool,
         _actor_id: UUID | None,
     ) -> dict[str, Any]:
+
         case_id = _payload_uuid(payload, "case_id")
-        return calculate_benefit_value(db, case_id=case_id)
+
+        return calculate_benefit_value(
+            db,
+            case_id=case_id,
+        )
 
     @staticmethod
     def _calculate_case_priority(
@@ -244,8 +273,13 @@ class DomainServiceBroker:
         _requires_actor: bool,
         _actor_id: UUID | None,
     ) -> dict[str, Any]:
+
         case_id = _payload_uuid(payload, "case_id")
-        return calculate_case_priority(db, case_id=case_id)
+
+        return calculate_case_priority(
+            db,
+            case_id=case_id,
+        )
 
     @staticmethod
     def _analyze_property(
@@ -254,25 +288,31 @@ class DomainServiceBroker:
         _requires_actor: bool,
         _actor_id: UUID | None,
     ) -> dict[str, Any]:
+
         del db
+
         equity = calculate_equity(
             estimated_property_value=float(payload.get("estimated_property_value", 0)),
             loan_balance=float(payload.get("loan_balance", 0)),
         )
+
         ltv = calculate_ltv(
             loan_balance=float(payload.get("loan_balance", 0)),
             estimated_property_value=float(payload.get("estimated_property_value", 0)),
         )
+
         rescue_score = calculate_rescue_score(
             arrears_amount=float(payload.get("arrears_amount", 0)),
             homeowner_income=float(payload.get("homeowner_income", 0)),
             foreclosure_stage=str(payload.get("foreclosure_stage", "pre_foreclosure")),
         )
+
         acquisition_score = calculate_acquisition_score(
             equity=equity,
             ltv=ltv,
             foreclosure_stage=str(payload.get("foreclosure_stage", "pre_foreclosure")),
         )
+
         return {
             "equity": equity,
             "ltv": ltv,
@@ -292,6 +332,7 @@ class DomainServiceBroker:
         _requires_actor: bool,
         actor_id: UUID | None,
     ) -> dict[str, Any]:
+
         referral = route_case_to_partner(
             db,
             case_id=_payload_uuid(payload, "case_id"),
@@ -299,7 +340,11 @@ class DomainServiceBroker:
             routing_category=str(payload.get("routing_category", "nonprofit_support")),
             actor_id=actor_id,
         )
-        return {"partner_referral_id": str(referral.id), "status": referral.status}
+
+        return {
+            "partner_referral_id": str(referral.id),
+            "status": referral.status,
+        }
 
     @staticmethod
     def _add_property_to_portfolio(
@@ -308,7 +353,13 @@ class DomainServiceBroker:
         _requires_actor: bool,
         actor_id: UUID | None,
     ) -> dict[str, Any]:
-        asset = add_property_to_portfolio(db, payload=payload, actor_id=actor_id)
+
+        asset = add_property_to_portfolio(
+            db,
+            payload=payload,
+            actor_id=actor_id,
+        )
+
         return {"property_asset_id": str(asset.id)}
 
     @staticmethod
@@ -318,7 +369,9 @@ class DomainServiceBroker:
         _requires_actor: bool,
         _actor_id: UUID | None,
     ) -> dict[str, Any]:
+
         del payload
+
         return calculate_portfolio_equity(db)
 
     @staticmethod
@@ -328,6 +381,7 @@ class DomainServiceBroker:
         _requires_actor: bool,
         actor_id: UUID | None,
     ) -> dict[str, Any]:
+
         profile = create_membership(
             db,
             user_id=_payload_uuid(payload, "user_id"),
@@ -335,10 +389,12 @@ class DomainServiceBroker:
             membership_type=str(payload.get("membership_type", "cooperative")),
             actor_id=actor_id,
         )
+
         return {"membership_profile_id": str(profile.id)}
 
 
 class ModuleLoaderService:
+
     def __init__(self, app: FastAPI, db: Session):
         self.app = app
         self.db = db
@@ -346,9 +402,13 @@ class ModuleLoaderService:
         self.domain_broker = DomainServiceBroker()
 
     def load_active_modules(self) -> int:
+
         active_modules = (
             self.db.query(ModuleRegistry)
-            .filter(ModuleRegistry.is_active.is_(True), ModuleRegistry.status == "active")
+            .filter(
+                ModuleRegistry.is_active.is_(True),
+                ModuleRegistry.status == "active",
+            )
             .all()
         )
 
@@ -356,44 +416,66 @@ class ModuleLoaderService:
             self.app.state.dynamic_module_routes = set()
 
         loaded_count = 0
+
         for module in active_modules:
+
             if not self._validate_spec(module):
                 continue
 
             route_key = f"{module.module_name}:{module.version}"
+
             if route_key in self.app.state.dynamic_module_routes:
                 continue
 
             self._register_module_router(module)
+
             self.app.state.dynamic_module_routes.add(route_key)
+
             loaded_count += 1
-            self._log_load_event(module=module, reason_code="module_loaded", after_state={"route_key": route_key})
+
+            self._log_load_event(
+                module=module,
+                reason_code="module_loaded",
+                after_state={"route_key": route_key},
+            )
 
         self.db.commit()
+
         return loaded_count
 
     def _validate_spec(self, module: ModuleRegistry) -> bool:
+
         validation_errors = self.registry_service._validation_errors(module)
 
-        services_ok, services_reason = self.domain_broker.validate_required_services(module.required_services or [])
+        services_ok, services_reason = self.domain_broker.validate_required_services(
+            module.required_services or []
+        )
+
         if not services_ok:
             validation_errors.append(services_reason)
 
         if validation_errors:
+
             module.status = "draft"
             module.validation_errors = validation_errors
             module.is_active = False
+
             self._log_load_event(
                 module=module,
                 reason_code="module_load_rejected",
                 after_state={"errors": validation_errors},
             )
+
             return False
 
         return True
 
     def _register_module_router(self, module: ModuleRegistry) -> None:
-        router = APIRouter(prefix=f"/modules/{module.module_name}", tags=["dynamic-modules"])
+
+        router = APIRouter(
+            prefix=f"/modules/{module.module_name}",
+            tags=["dynamic-modules"],
+        )
 
         @router.post("/actions/{action_name}")
         def invoke_module_action(
@@ -404,6 +486,7 @@ class ModuleLoaderService:
             module_name: str = module.module_name,
             module_version: str = module.version,
         ):
+
             live_module = (
                 db.query(ModuleRegistry)
                 .filter(
@@ -414,6 +497,7 @@ class ModuleLoaderService:
                 )
                 .first()
             )
+
             if not live_module:
                 raise HTTPException(status_code=404, detail="Module is not active")
 
@@ -421,6 +505,7 @@ class ModuleLoaderService:
                 raise HTTPException(status_code=400, detail="case_id is required for policy authorization")
 
             policy_authorizer = PolicyAuthorizer(db)
+
             policy_authorizer.require_case_action(
                 user=user,
                 case_id=request.case_id,
@@ -457,6 +542,7 @@ class ModuleLoaderService:
                     policy_version_id=None,
                 )
             )
+
             db.commit()
 
             return {
@@ -470,6 +556,7 @@ class ModuleLoaderService:
         self.app.include_router(router)
 
     def _log_load_event(self, *, module: ModuleRegistry, reason_code: str, after_state: dict[str, Any]) -> None:
+
         self.db.add(
             AuditLog(
                 id=uuid4(),
@@ -490,7 +577,9 @@ class ModuleLoaderService:
 
 
 def load_modules_on_startup(app: FastAPI) -> int:
+
     db = SessionLocal()
+
     try:
         return ModuleLoaderService(app, db).load_active_modules()
     finally:
