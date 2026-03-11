@@ -10,6 +10,7 @@ from app.models.cases import Case
 from app.models.documents import Document
 from app.models.users import UserRole
 from app.services.workflow_engine import get_case_workflow_summary, initialize_case_workflow, sync_case_workflow
+from app.services.veteran_intelligence_service import partner_aggregate_report
 
 router = APIRouter(prefix="/partner/v1", tags=["Partner API"])
 
@@ -75,4 +76,30 @@ def partner_evidence_verification(
             }
             for d in docs
         ],
+    }
+
+
+@router.get("/veterans/benefit-discovery-summary")
+def veteran_benefit_discovery_summary(
+    state_of_residence: str | None = None,
+    db: Session = Depends(get_db),
+    _user=Depends(require_role([UserRole.partner_org, UserRole.admin, UserRole.audit_steward])),
+):
+    return {
+        "rows": partner_aggregate_report(db, state_of_residence=state_of_residence),
+        "anonymized": True,
+    }
+
+
+@router.post("/veterans/integration-ping")
+def veteran_integration_ping(
+    payload: dict,
+    db: Session = Depends(get_db),
+    _user=Depends(require_role([UserRole.partner_org, UserRole.admin, UserRole.audit_steward])),
+):
+    _ = db
+    return {
+        "status": "accepted",
+        "integration": payload.get("integration", "unknown"),
+        "note": "Partner integration endpoint is active for veteran intelligence reporting.",
     }

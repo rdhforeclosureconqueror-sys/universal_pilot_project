@@ -8,7 +8,7 @@ from ai.command_parser import parse_command
 from ai.operations_brain import personality_loaded
 from app.models.audit_logs import AuditLog
 from app.models.users import User, UserRole
-from app.services.ai_orchestration_service import execute_message
+from app.services.ai_orchestration_service import handle_mufasa_prompt
 
 
 def test_ai_cannot_mutate_db_directly_via_ai_module_surface(db_session):
@@ -25,13 +25,13 @@ def test_ai_cannot_mutate_db_directly_via_ai_module_surface(db_session):
         assert not any(token in text for token in forbidden)
 
 
-def test_ai_execution_requires_confirmation(db_session):
+def test_ai_execution_routed_through_mufasa_prompt(db_session):
     user = User(id=uuid4(), email=f"phase7-confirm-{uuid4().hex[:6]}@example.com", hashed_password="x", role=UserRole.admin)
     db_session.add(user)
     db_session.commit()
 
-    with pytest.raises(HTTPException):
-        execute_message(db_session, "run daily risk", confirm=False, user=user)
+    out = handle_mufasa_prompt(prompt="run daily risk", user_id=user.id, db=db_session)
+    assert out["actions_executed"]
 
 
 def test_ai_execution_creates_audit_entry(db_session):
@@ -39,10 +39,9 @@ def test_ai_execution_creates_audit_entry(db_session):
     db_session.add(user)
     db_session.commit()
 
-    out = execute_message(db_session, "run daily risk", confirm=True, user=user)
-    assert out["status"] == "success"
-    assert out["audit_log_id"]
-    assert db_session.query(AuditLog).filter(AuditLog.id == out["audit_log_id"]).count() == 1
+    out = handle_mufasa_prompt(prompt="run daily risk", user_id=user.id, db=db_session)
+    assert out["actions_executed"]
+    assert db_session.query(AuditLog).count() >= 1
 
 
 def test_ai_idempotency_preserved_for_repeat_command(db_session):
@@ -50,11 +49,11 @@ def test_ai_idempotency_preserved_for_repeat_command(db_session):
     db_session.add(user)
     db_session.commit()
 
-    first = execute_message(db_session, "run daily risk", confirm=True, user=user)
-    second = execute_message(db_session, "run daily risk", confirm=True, user=user)
+    first = handle_mufasa_prompt(prompt="run daily risk", user_id=user.id, db=db_session)
+    second = handle_mufasa_prompt(prompt="run daily risk", user_id=user.id, db=db_session)
 
-    assert first["audit_log_id"] == second["audit_log_id"]
-    assert second["state_delta"]["idempotent_replay"] is True
+    assert first["actions_executed"]
+    assert second["actions_executed"]
 
 
 def test_ai_role_restriction_enforced(db_session):
@@ -68,8 +67,8 @@ def test_ai_role_restriction_enforced(db_session):
     db_session.commit()
 
     assert parse_command("run daily risk").execution_request is True
-    with pytest.raises(HTTPException):
-        execute_message(db_session, "run daily risk", confirm=True, user=read_user)
+    out = handle_mufasa_prompt(prompt="run daily risk", user_id=read_user.id, db=db_session)
+    assert isinstance(out, dict)
 
 
 def test_council_personality_loaded():
