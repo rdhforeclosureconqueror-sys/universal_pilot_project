@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import asdict
 import os
 import re
 from uuid import UUID
@@ -13,7 +12,7 @@ from sqlalchemy.orm import Session
 from ai.command_parser import parse_command
 from ai.context_builder import build_context
 from ai.operations_brain import build_advisory
-from ai.role_manager import AIRole, authorize, user_ai_role
+from ai.role_manager import authorize, user_ai_role
 from ai.voice_interface import synthesize_audio, transcribe_audio
 
 from app.models.audit_logs import AuditLog
@@ -71,26 +70,33 @@ def advisory_message(db: Session, message: str) -> dict:
     context = build_context(db)
 
     if parsed.intent == "veteran_benefit_advisory":
+
         case_match = re.search(
-            r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}",
+            r"[0-9a-fA-F\-]{36}",
             message,
         )
+
         if case_match:
             try:
                 advisory = get_advisory(
-                    db, case_id=UUID(case_match.group(0)), question=message
+                    db,
+                    case_id=UUID(case_match.group(0)),
+                    question=message,
                 )
                 response = advisory["answer"]
+
             except Exception:
                 response = (
-                    "Veteran advisory is available. Please provide a valid case UUID tied "
+                    "Veteran advisory is available. Provide a valid case UUID tied "
                     "to a veteran profile for precise eligibility results."
                 )
+
         else:
             response = (
                 "To answer veteran eligibility questions precisely, include the case UUID "
                 "linked to the veteran profile."
             )
+
     else:
         response = build_advisory(message, parsed, context)
 
@@ -102,7 +108,9 @@ def advisory_message(db: Session, message: str) -> dict:
 
 
 def _is_system_action_prompt(prompt: str) -> bool:
+
     text = prompt.lower().strip()
+
     action_keywords = [
         "scan",
         "ingest",
@@ -119,10 +127,17 @@ def _is_system_action_prompt(prompt: str) -> bool:
         "run diagnostics",
         "run investor demo",
     ]
+
     return any(k in text for k in action_keywords)
 
 
-def handle_mufasa_question(prompt: str, db: Session, *, investor_mode: bool = False) -> str:
+def handle_mufasa_question(
+    prompt: str,
+    db: Session,
+    *,
+    investor_mode: bool = False,
+) -> str:
+
     knowledge = PlatformKnowledgeService(db)
 
     overview = knowledge.get_platform_overview()
@@ -132,13 +147,12 @@ def handle_mufasa_question(prompt: str, db: Session, *, investor_mode: bool = Fa
 
     system_prompt = (
         "You are Mufasa, an expert platform guide for housing intervention operations. "
-        "Answer clearly and concretely using the provided platform context."
+        "Answer clearly using the provided platform context."
     )
 
     if investor_mode:
         system_prompt += (
-            " Frame explanations in terms of operational leverage, impact scale, "
-            "and investor-facing differentiation."
+            " Emphasize operational leverage, impact scale, and investor differentiation."
         )
 
     context = {
@@ -152,6 +166,7 @@ def handle_mufasa_question(prompt: str, db: Session, *, investor_mode: bool = Fa
     api_key = os.getenv("OPENAI_API_KEY", "").strip()
 
     if api_key:
+
         try:
             from openai import OpenAI
 
@@ -164,25 +179,28 @@ def handle_mufasa_question(prompt: str, db: Session, *, investor_mode: bool = Fa
                     {"role": "system", "content": system_prompt},
                     {
                         "role": "user",
-                        "content": f"{prompt}\n\nPlatform Context:\n{json.dumps(context)[:12000]}",
+                        "content": f"{prompt}\n\nPlatform Context:\n{json.dumps(context, default=str)[:12000]}",
                     },
                 ],
             )
 
             answer = completion.choices[0].message.content
+
             if answer:
                 return answer.strip()
 
         except Exception:
             pass
 
-    domain_hint = "system"
     lower = prompt.lower()
+    domain_hint = "system"
 
     if "foreclosure" in lower:
         domain_hint = "foreclosure_intelligence"
+
     elif "veteran" in lower:
         domain_hint = "veteran_intelligence"
+
     elif "lead" in lower:
         domain_hint = "lead_intelligence"
 
@@ -200,7 +218,12 @@ def handle_mufasa_question(prompt: str, db: Session, *, investor_mode: bool = Fa
     )
 
 
-def _execute_mufasa_actions(prompt: str, user_id: UUID, db: Session):
+def _execute_mufasa_actions(
+    prompt: str,
+    user_id: UUID,
+    db: Session,
+):
+
     parsed = parse_command(prompt)
     normalized = prompt.lower().strip()
 
@@ -209,26 +232,42 @@ def _execute_mufasa_actions(prompt: str, user_id: UUID, db: Session):
     response_fragments: list[str] = []
 
     def run_action(name: str, fn):
+
         try:
             result = fn()
             actions_executed.append(name)
             results[name] = result
             return result
+
         except Exception as exc:
             actions_executed.append(name)
             results[name] = {"error": str(exc)}
             return None
 
     if "scan foreclosure" in normalized:
-        run_action("scan_foreclosure_filings", lambda: weekly_foreclosure_scan(db))
+
+        run_action(
+            "scan_foreclosure_filings",
+            lambda: weekly_foreclosure_scan(db),
+        )
+
         response_fragments.append("Scanning foreclosure filings.")
 
     if "run investor demo" in normalized:
+
         response_fragments.append(
             "Running investor demo across lead, foreclosure, skiptrace and portfolio workflows."
         )
-        run_action("scan_foreclosure_filings", lambda: weekly_foreclosure_scan(db))
-        run_action("calculate_portfolio_equity", lambda: calculate_portfolio_equity(db))
+
+        run_action(
+            "scan_foreclosure_filings",
+            lambda: weekly_foreclosure_scan(db),
+        )
+
+        run_action(
+            "calculate_portfolio_equity",
+            lambda: calculate_portfolio_equity(db),
+        )
 
     return actions_executed, results, response_fragments
 
@@ -253,6 +292,7 @@ def handle_mufasa_prompt(
         )
 
         if not response_fragments:
+
             response_fragments.append(
                 "I understood the request but no executable action matched."
             )
@@ -260,6 +300,7 @@ def handle_mufasa_prompt(
         final_response = " ".join(response_fragments)
 
     else:
+
         final_response = handle_mufasa_question(
             prompt=prompt,
             db=db,
