@@ -15,7 +15,11 @@ from app.models.policy_versions import PolicyVersion
 def create_foreclosure_profile(
     db: Session, *, case_id: UUID | None, payload: dict, actor_id: UUID | None
 ) -> dict:
-    resolved_case_id = case_id or _auto_create_case(db, actor_id=actor_id, payload=payload)
+    resolved_case_id = case_id or _auto_create_case(
+        db,
+        actor_id=actor_id,
+        payload=payload,
+    )
 
     profile = (
         db.query(ForeclosureCaseData)
@@ -24,9 +28,14 @@ def create_foreclosure_profile(
     )
 
     if profile:
-        return {"case_id": resolved_case_id, "profile_created": True, "profile_id": profile.id}
+        return {
+            "case_id": resolved_case_id,
+            "profile_created": True,
+            "profile_id": profile.id,
+        }
 
     profile = ForeclosureCaseData(case_id=resolved_case_id, **payload)
+
     db.add(profile)
     db.flush()
 
@@ -36,14 +45,24 @@ def create_foreclosure_profile(
         case_id=resolved_case_id,
         action_type="foreclosure_profile_created",
         reason_code="foreclosure_profile_created",
-        after_state={"profile_id": str(profile.id)},
+        after_state={
+            "profile_id": str(profile.id),
+        },
     )
 
-    return {"case_id": resolved_case_id, "profile_created": True, "profile_id": profile.id}
+    return {
+        "case_id": resolved_case_id,
+        "profile_created": True,
+        "profile_id": profile.id,
+    }
 
 
 def update_foreclosure_status(
-    db: Session, *, case_id: UUID, foreclosure_stage: str, actor_id: UUID | None
+    db: Session,
+    *,
+    case_id: UUID,
+    foreclosure_stage: str,
+    actor_id: UUID | None,
 ) -> ForeclosureCaseData:
 
     profile = (
@@ -56,7 +75,9 @@ def update_foreclosure_status(
         raise HTTPException(status_code=404, detail="Foreclosure profile not found")
 
     before = profile.foreclosure_stage
+
     profile.foreclosure_stage = foreclosure_stage
+
     db.flush()
 
     _audit(
@@ -74,7 +95,12 @@ def update_foreclosure_status(
     return profile
 
 
-def calculate_case_priority(db: Session, *, case_id: UUID) -> dict:
+def calculate_case_priority(
+    db: Session,
+    *,
+    case_id: UUID,
+) -> dict:
+
     profile = (
         db.query(ForeclosureCaseData)
         .filter(ForeclosureCaseData.case_id == case_id)
@@ -94,6 +120,7 @@ def calculate_case_priority(db: Session, *, case_id: UUID) -> dict:
     }.get(stage, 10)
 
     arrears = float(profile.arrears_amount or 0)
+
     income = float(profile.homeowner_income or 0)
 
     pressure = 0 if income <= 0 else min(40, (arrears / max(income, 1)) * 10)
@@ -139,7 +166,12 @@ def _audit(
     )
 
 
-def _auto_create_case(db: Session, *, actor_id: UUID | None, payload: dict) -> UUID:
+def _auto_create_case(
+    db: Session,
+    *,
+    actor_id: UUID | None,
+    payload: dict,
+) -> UUID:
 
     policy = (
         db.query(PolicyVersion)
@@ -170,6 +202,7 @@ def _auto_create_case(db: Session, *, actor_id: UUID | None, payload: dict) -> U
     )
 
     db.add(case)
+
     db.flush()
 
     _audit(
@@ -178,7 +211,9 @@ def _auto_create_case(db: Session, *, actor_id: UUID | None, payload: dict) -> U
         case_id=case.id,
         action_type="foreclosure_case_auto_created",
         reason_code="auto_case_initialized",
-        after_state={"program_key": policy.program_key},
+        after_state={
+            "program_key": policy.program_key,
+        },
     )
 
     return case.id

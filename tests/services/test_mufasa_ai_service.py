@@ -57,3 +57,19 @@ def test_handle_mufasa_prompt_ingest_leads(monkeypatch):
 
     assert "ingest_leads" in result["actions_executed"]
     assert result["results"]["ingest_leads"]["leads_ingested"] >= 1
+
+
+def test_handle_mufasa_prompt_routes_question_to_explainer(monkeypatch):
+    db = _DB()
+    user_id = uuid4()
+
+    monkeypatch.setattr(
+        "app.services.ai_orchestration_service.handle_mufasa_question",
+        lambda prompt, db, investor_mode=False: f"Explainer: {prompt} / investor={investor_mode}",
+    )
+
+    result = handle_mufasa_prompt("What does this platform do?", user_id=user_id, db=db, investor_mode=True)
+
+    assert result["actions_executed"] == []
+    assert "Explainer:" in result["response"]
+    assert "investor=True" in result["response"]

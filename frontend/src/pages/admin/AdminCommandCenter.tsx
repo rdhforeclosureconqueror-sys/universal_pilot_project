@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 
 import { AdminActionButton } from "../../components/AdminActionButton";
+import { MufasaAssistant } from "../../components/MufasaAssistant";
 import { HttpMethod } from "../../services/apiClient";
 
 type ActionConfig = {
@@ -28,11 +29,46 @@ const capabilitySections: SectionConfig[] = [
   {
     title: "Lead Intelligence",
     actions: [
-      { label: "Ingest Leads", endpoint: "/lead-intelligence/ingest", method: "POST", payload: { leads: [] } },
-      { label: "Ingest CSV Leads", endpoint: "/lead-intelligence/ingest-csv", method: "POST", payload: { csv_data: "" } },
-      { label: "Score Leads", endpoint: "/lead-intelligence/score", method: "POST", payload: { leads: [] } },
-      { label: "Deduplicate Leads", endpoint: "/botops/leads/upsert", method: "POST", payload: [] },
-      { label: "Create Case From Lead", endpoint: "/pipeline/foreclosure-analysis", method: "POST", payload: { lead_id: "" } },
+      {
+        label: "Ingest Leads",
+        endpoint: "/leads/intelligence/ingest",
+        method: "POST",
+        payload: {
+          source_name: "mufasa",
+          source_type: "ai",
+          leads: [
+            {
+              property_address: "101 Elm St",
+              city: "Dallas",
+              state: "TX",
+              foreclosure_stage: "pre_foreclosure",
+            },
+          ],
+        },
+      },
+      {
+        label: "Ingest CSV Leads",
+        endpoint: "/leads/intelligence/ingest-csv?source_name=csv_import&source_type=file",
+        method: "POST",
+      },
+      {
+        label: "Score Leads",
+        endpoint: "/admin/ai/mufasa/chat",
+        method: "POST",
+        payload: { prompt: "score leads" },
+      },
+      {
+        label: "Deduplicate Leads",
+        endpoint: "/botops/leads/upsert",
+        method: "POST",
+        payload: [],
+      },
+      {
+        label: "Create Case From Lead",
+        endpoint: "/admin/ai/mufasa/chat",
+        method: "POST",
+        payload: { prompt: "create case from lead" },
+      },
     ],
   },
   {
@@ -64,16 +100,35 @@ const capabilitySections: SectionConfig[] = [
   {
     title: "Veteran Intelligence",
     actions: [
-      { label: "Create Veteran Profile", endpoint: "/veteran-intelligence/profile", method: "POST", payload: {} },
-      { label: "Scan Veteran Benefits", endpoint: "/partners/veterans/benefit-discovery-summary", method: "GET" },
-      { label: "Generate Veteran Action Plan", endpoint: "/admin/ai/run-autopilot", method: "POST", payload: { domain: "veteran" } },
-      { label: "Generate Veteran Documents", endpoint: "/admin/ai/summarize-case", method: "POST", payload: { context: "veteran-documents" } },
+      {
+        label: "Create Veteran Profile",
+        endpoint: "/admin/ai/mufasa/chat",
+        method: "POST",
+        payload: { prompt: "discover veteran benefits" },
+      },
+      {
+        label: "Scan Veteran Benefits",
+        endpoint: "/partners/veterans/benefit-discovery-summary",
+        method: "GET",
+      },
+      {
+        label: "Generate Veteran Action Plan",
+        endpoint: "/admin/ai/mufasa/chat",
+        method: "POST",
+        payload: { prompt: "generate veteran action plan" },
+      },
+      {
+        label: "Generate Veteran Documents",
+        endpoint: "/admin/ai/mufasa/chat",
+        method: "POST",
+        payload: { prompt: "generate veteran documents" },
+      },
     ],
   },
   {
     title: "Partner Routing",
     actions: [
-      { label: "Route Case to Partner", endpoint: "/partners/housing/route-case", method: "POST", payload: {} },
+      { label: "Route Case to Partner", endpoint: "/partners/route-case", method: "POST", payload: {} },
       { label: "View Partner Reports", endpoint: "/impact/opportunity-map", method: "GET" },
     ],
   },
@@ -87,7 +142,7 @@ const capabilitySections: SectionConfig[] = [
   {
     title: "Training",
     actions: [
-      { label: "Start Training Lesson", endpoint: "/training/step/intake", method: "GET" },
+      { label: "Start Training Lesson", endpoint: "/training/step/1", method: "GET" },
       { label: "Complete Training Lesson", endpoint: "/training/quiz_attempt", method: "POST", payload: {} },
       { label: "View Certifications", endpoint: "/training/system-overview", method: "GET" },
     ],
@@ -99,15 +154,20 @@ const capabilitySections: SectionConfig[] = [
         label: "Open Mufasa Assistant",
         endpoint: "/admin/ai/mufasa/chat",
         method: "POST",
-        payload: { message: "show capabilities" },
+        payload: { prompt: "show capabilities" },
       },
       {
         label: "Send AI Prompt",
         endpoint: "/admin/ai/mufasa/chat",
         method: "POST",
-        payload: { message: "run diagnostics and summarize status" },
+        payload: { prompt: "run diagnostics and summarize status" },
       },
-      { label: "Run AI Automation", endpoint: "/admin/ai/run-autopilot", method: "POST", payload: { dry_run: true } },
+      {
+        label: "Run AI Automation",
+        endpoint: "/admin/ai/mufasa/chat",
+        method: "POST",
+        payload: { prompt: "verify platform and run diagnostics" },
+      },
       { label: "Generate Investor Report", endpoint: "/impact/summary", method: "GET" },
     ],
   },
@@ -124,18 +184,40 @@ const AdminCommandCenter = () => {
   }, [history]);
 
   return (
-    <div className="admin-command-center" style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 20 }}>
+    <div
+      className="admin-command-center"
+      style={{
+        display: "grid",
+        gridTemplateColumns: "2fr 1fr",
+        gap: 20,
+      }}
+    >
       <div>
         <h1>Admin Command Center</h1>
         <p>Execute platform capabilities by section. All actions call backend APIs directly.</p>
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
+        <MufasaAssistant />
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+            gap: 16,
+            marginTop: 16,
+          }}
+        >
           {capabilitySections.map((section) => (
             <article
               key={section.title}
-              style={{ border: "1px solid #d7deeb", borderRadius: 10, padding: 14, background: "#ffffff" }}
+              style={{
+                border: "1px solid #d7deeb",
+                borderRadius: 10,
+                padding: 14,
+                background: "#ffffff",
+              }}
             >
               <h3>{section.title}</h3>
+
               <div style={{ display: "grid", gap: 8 }}>
                 {section.actions.map((action) => (
                   <AdminActionButton
@@ -144,7 +226,9 @@ const AdminCommandCenter = () => {
                     endpoint={action.endpoint}
                     method={action.method}
                     payload={action.payload}
-                    onResult={(result) => setHistory((previous) => [result, ...previous].slice(0, 50))}
+                    onResult={(result) =>
+                      setHistory((previous) => [result, ...previous].slice(0, 50))
+                    }
                   />
                 ))}
               </div>
@@ -153,10 +237,30 @@ const AdminCommandCenter = () => {
         </div>
       </div>
 
-      <aside style={{ border: "1px solid #d7deeb", borderRadius: 10, background: "#0d1324", color: "#e9efff", padding: 14 }}>
+      <aside
+        style={{
+          border: "1px solid #d7deeb",
+          borderRadius: 10,
+          background: "#0d1324",
+          color: "#e9efff",
+          padding: 14,
+        }}
+      >
         <h3 style={{ marginTop: 0 }}>Response Console</h3>
-        <p style={{ color: "#8fa3d9" }}>Latest API responses and errors are logged here.</p>
-        <pre style={{ whiteSpace: "pre-wrap", overflow: "auto", maxHeight: "75vh" }}>{panelOutput}</pre>
+
+        <p style={{ color: "#8fa3d9" }}>
+          Latest API responses and errors are logged here.
+        </p>
+
+        <pre
+          style={{
+            whiteSpace: "pre-wrap",
+            overflow: "auto",
+            maxHeight: "75vh",
+          }}
+        >
+          {panelOutput}
+        </pre>
       </aside>
     </div>
   );
