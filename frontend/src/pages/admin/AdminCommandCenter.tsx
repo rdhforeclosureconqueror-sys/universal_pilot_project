@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 
 import { AdminActionButton } from "../../components/AdminActionButton";
-import { MufasaAssistant } from "../../components/MufasaAssistant";
 import { HttpMethod } from "../../services/apiClient";
 
 type ActionConfig = {
@@ -23,17 +22,17 @@ const capabilitySections: SectionConfig[] = [
       { label: "Verify System Health", endpoint: "/admin/system/verify/phase10", method: "POST" },
       { label: "Run AI Diagnostics", endpoint: "/verify/policy-engine", method: "GET" },
       { label: "View Capability Report", endpoint: "/platform/capabilities", method: "GET" },
-      { label: "View Audit Logs", endpoint: "/admin/memberships", method: "GET" },
+      { label: "View Audit Logs", endpoint: "/admin/dashboard/ai-command-logs", method: "GET" },
     ],
   },
   {
     title: "Lead Intelligence",
     actions: [
-      { label: "Ingest Leads", endpoint: "/leads/intelligence/ingest", method: "POST", payload: { source_name: "mufasa", source_type: "ai", leads: [{ property_address: "101 Elm St", city: "Dallas", state: "TX", foreclosure_stage: "pre_foreclosure" }] } },
-      { label: "Ingest CSV Leads", endpoint: "/leads/intelligence/ingest-csv?source_name=csv_import&source_type=file", method: "POST" },
-      { label: "Score Leads", endpoint: "/admin/ai/mufasa/chat", method: "POST", payload: { prompt: "score leads" } },
+      { label: "Ingest Leads", endpoint: "/lead-intelligence/ingest", method: "POST", payload: { leads: [] } },
+      { label: "Ingest CSV Leads", endpoint: "/lead-intelligence/ingest-csv", method: "POST", payload: { csv_data: "" } },
+      { label: "Score Leads", endpoint: "/lead-intelligence/score", method: "POST", payload: { leads: [] } },
       { label: "Deduplicate Leads", endpoint: "/botops/leads/upsert", method: "POST", payload: [] },
-      { label: "Create Case From Lead", endpoint: "/admin/ai/mufasa/chat", method: "POST", payload: { prompt: "create case from lead" } },
+      { label: "Create Case From Lead", endpoint: "/pipeline/foreclosure-analysis", method: "POST", payload: { lead_id: "" } },
     ],
   },
   {
@@ -65,16 +64,16 @@ const capabilitySections: SectionConfig[] = [
   {
     title: "Veteran Intelligence",
     actions: [
-      { label: "Create Veteran Profile", endpoint: "/admin/ai/mufasa/chat", method: "POST", payload: { prompt: "discover veteran benefits" } },
+      { label: "Create Veteran Profile", endpoint: "/veteran-intelligence/profile", method: "POST", payload: {} },
       { label: "Scan Veteran Benefits", endpoint: "/partners/veterans/benefit-discovery-summary", method: "GET" },
-      { label: "Generate Veteran Action Plan", endpoint: "/admin/ai/mufasa/chat", method: "POST", payload: { prompt: "generate veteran action plan" } },
-      { label: "Generate Veteran Documents", endpoint: "/admin/ai/mufasa/chat", method: "POST", payload: { prompt: "generate veteran documents" } },
+      { label: "Generate Veteran Action Plan", endpoint: "/admin/ai/run-autopilot", method: "POST", payload: { domain: "veteran" } },
+      { label: "Generate Veteran Documents", endpoint: "/admin/ai/summarize-case", method: "POST", payload: { context: "veteran-documents" } },
     ],
   },
   {
     title: "Partner Routing",
     actions: [
-      { label: "Route Case to Partner", endpoint: "/partners/route-case", method: "POST", payload: {} },
+      { label: "Route Case to Partner", endpoint: "/partners/housing/route-case", method: "POST", payload: {} },
       { label: "View Partner Reports", endpoint: "/impact/opportunity-map", method: "GET" },
     ],
   },
@@ -88,7 +87,7 @@ const capabilitySections: SectionConfig[] = [
   {
     title: "Training",
     actions: [
-      { label: "Start Training Lesson", endpoint: "/training/step/1", method: "GET" },
+      { label: "Start Training Lesson", endpoint: "/training/step/intake", method: "GET" },
       { label: "Complete Training Lesson", endpoint: "/training/quiz_attempt", method: "POST", payload: {} },
       { label: "View Certifications", endpoint: "/training/system-overview", method: "GET" },
     ],
@@ -100,15 +99,15 @@ const capabilitySections: SectionConfig[] = [
         label: "Open Mufasa Assistant",
         endpoint: "/admin/ai/mufasa/chat",
         method: "POST",
-        payload: { prompt: "show capabilities" },
+        payload: { message: "show capabilities" },
       },
       {
         label: "Send AI Prompt",
         endpoint: "/admin/ai/mufasa/chat",
         method: "POST",
-        payload: { prompt: "run diagnostics and summarize status" },
+        payload: { message: "run diagnostics and summarize status" },
       },
-      { label: "Run AI Automation", endpoint: "/admin/ai/mufasa/chat", method: "POST", payload: { prompt: "verify platform and run diagnostics" } },
+      { label: "Run AI Automation", endpoint: "/admin/ai/run-autopilot", method: "POST", payload: { dry_run: true } },
       { label: "Generate Investor Report", endpoint: "/impact/summary", method: "GET" },
     ],
   },
@@ -129,9 +128,8 @@ const AdminCommandCenter = () => {
       <div>
         <h1>Admin Command Center</h1>
         <p>Execute platform capabilities by section. All actions call backend APIs directly.</p>
-        <MufasaAssistant />
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16, marginTop: 16 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
           {capabilitySections.map((section) => (
             <article
               key={section.title}
