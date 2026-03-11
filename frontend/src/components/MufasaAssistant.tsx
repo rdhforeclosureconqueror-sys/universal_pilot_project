@@ -1,5 +1,4 @@
 import { useMemo, useRef, useState } from "react";
-
 import { apiClient } from "../services/apiClient";
 
 type ChatRole = "ai" | "user" | "system";
@@ -27,10 +26,12 @@ export const MufasaAssistant = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([
     { id: crypto.randomUUID(), role: "ai", text: "Welcome. How can I help?" },
   ]);
+
   const [prompt, setPrompt] = useState("");
   const [isRunning, setIsRunning] = useState(false);
   const [executionIndicator, setExecutionIndicator] = useState<string>("");
   const [investorMode, setInvestorMode] = useState(false);
+
   const threadRef = useRef<HTMLDivElement | null>(null);
 
   const scrollToBottom = () => {
@@ -47,7 +48,11 @@ export const MufasaAssistant = () => {
     scrollToBottom();
   };
 
-  const streamAiMessage = async (content: string, actions: string[], results: unknown) => {
+  const streamAiMessage = async (
+    content: string,
+    actions: string[],
+    results: unknown,
+  ) => {
     const id = crypto.randomUUID();
 
     pushMessage({
@@ -115,7 +120,6 @@ export const MufasaAssistant = () => {
         [],
         body,
       );
-
       return;
     }
 
@@ -133,7 +137,6 @@ export const MufasaAssistant = () => {
 
     try {
       const current = prompt;
-
       setPrompt("");
 
       await sendPrompt(current);

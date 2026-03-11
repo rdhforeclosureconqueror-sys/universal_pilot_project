@@ -13,8 +13,8 @@ from app.models.module_registry import ModuleRegistry
 from app.models.users import User
 from app.services.escalation_service import run_daily_risk_evaluation
 from app.services.foreclosure_intelligence_service import calculate_case_priority
-from app.services.membership_service import create_membership
 from app.services.module_registry_service import ModuleRegistryService
+from app.services.membership_service import create_membership
 from app.services.partner_routing_service import route_case_to_partner
 from app.services.property_analysis_service import (
     calculate_acquisition_score,
@@ -37,6 +37,7 @@ from app.services.veteran_intelligence_service import (
     update_benefit_progress,
     upsert_veteran_profile,
 )
+
 from auth.authorization import PolicyAuthorizer
 from auth.dependencies import get_current_user
 from db.session import SessionLocal, get_db
@@ -50,11 +51,11 @@ class ModuleActionRequest(BaseModel):
 def _payload_uuid(payload: dict[str, Any], key: str) -> UUID:
     value = payload.get(key)
     if not value:
-        raise HTTPException(status_code=400, detail=f"'{key}' is required")
+        raise HTTPException(status_code=400, detail=f"{key} is required")
     try:
         return UUID(str(value))
     except Exception as exc:
-        raise HTTPException(status_code=400, detail=f"'{key}' must be a UUID") from exc
+        raise HTTPException(status_code=400, detail=f"{key} must be a UUID") from exc
 
 
 class DomainServiceBroker:
@@ -135,79 +136,35 @@ class DomainServiceBroker:
         return handler(db, payload, requires_actor and actor_id is not None, actor_id)
 
     @staticmethod
-    def _run_daily_risk_evaluation(
-        db: Session,
-        payload: dict[str, Any],
-        _requires_actor: bool,
-        _actor_id: UUID | None,
-    ) -> dict[str, Any]:
+    def _run_daily_risk_evaluation(db: Session, payload: dict[str, Any], _requires_actor: bool, _actor_id: UUID | None):
         del payload
         return run_daily_risk_evaluation(db)
 
     @staticmethod
-    def _upsert_veteran_profile(
-        db: Session,
-        payload: dict[str, Any],
-        _requires_actor: bool,
-        actor_id: UUID | None,
-    ) -> dict[str, Any]:
-
+    def _upsert_veteran_profile(db: Session, payload: dict[str, Any], _requires_actor: bool, actor_id: UUID | None):
         profile = upsert_veteran_profile(db, actor_id=actor_id, payload=payload)
-
-        return {
-            "case_id": str(profile.case_id),
-            "disability_rating": profile.disability_rating,
-        }
+        return {"case_id": str(profile.case_id), "disability_rating": profile.disability_rating}
 
     @staticmethod
-    def _scan_veteran_benefits(
-        db: Session,
-        payload: dict[str, Any],
-        _requires_actor: bool,
-        _actor_id: UUID | None,
-    ) -> dict[str, Any]:
-
+    def _scan_veteran_benefits(db: Session, payload: dict[str, Any], _requires_actor: bool, _actor_id: UUID | None):
         case_id = _payload_uuid(payload, "case_id")
-
         return match_benefits(db, case_id=case_id)
 
     @staticmethod
-    def _generate_veteran_action_plan(
-        db: Session,
-        payload: dict[str, Any],
-        _requires_actor: bool,
-        _actor_id: UUID | None,
-    ) -> dict[str, Any]:
-
+    def _generate_veteran_action_plan(db: Session, payload: dict[str, Any], _requires_actor: bool, _actor_id: UUID | None):
         case_id = _payload_uuid(payload, "case_id")
-
         return generate_action_plan(db, case_id=case_id)
 
     @staticmethod
-    def _generate_veteran_documents(
-        db: Session,
-        payload: dict[str, Any],
-        requires_actor: bool,
-        actor_id: UUID | None,
-    ) -> dict[str, Any]:
-
+    def _generate_veteran_documents(db: Session, payload: dict[str, Any], requires_actor: bool, actor_id: UUID | None):
         if requires_actor and actor_id is None:
             raise HTTPException(status_code=400, detail="actor_id required")
-
         case_id = _payload_uuid(payload, "case_id")
-
         return generate_documents(db, case_id=case_id, actor_id=actor_id)
 
     @staticmethod
-    def _update_benefit_progress(
-        db: Session,
-        payload: dict[str, Any],
-        _requires_actor: bool,
-        actor_id: UUID | None,
-    ) -> dict[str, Any]:
-
+    def _update_benefit_progress(db: Session, payload: dict[str, Any], _requires_actor: bool, actor_id: UUID | None):
         case_id = _payload_uuid(payload, "case_id")
-
         return update_benefit_progress(
             db,
             case_id=case_id,
@@ -218,170 +175,111 @@ class DomainServiceBroker:
         )
 
     @staticmethod
-    def _veteran_ai_advisory(
-        db: Session,
-        payload: dict[str, Any],
-        _requires_actor: bool,
-        _actor_id: UUID | None,
-    ) -> dict[str, Any]:
-
+    def _veteran_ai_advisory(db: Session, payload: dict[str, Any], _requires_actor: bool, _actor_id: UUID | None):
         case_id = _payload_uuid(payload, "case_id")
-
         return get_advisory(db, case_id=case_id, question=payload.get("question", ""))
 
-    @staticmethod
-    def _veteran_partner_aggregate_report(
-        db: Session,
-        payload: dict[str, Any],
-        _requires_actor: bool,
-        _actor_id: UUID | None,
-    ) -> dict[str, Any]:
 
-        return {
-            "rows": partner_aggregate_report(
-                db,
-                state_of_residence=payload.get("state_of_residence"),
+class ModuleLoaderService:
+
+    def __init__(self, app: FastAPI, db: Session):
+        self.app = app
+        self.db = db
+        self.registry_service = ModuleRegistryService(db)
+        self.domain_broker = DomainServiceBroker()
+
+    def load_active_modules(self) -> int:
+
+        active_modules = (
+            self.db.query(ModuleRegistry)
+            .filter(
+                ModuleRegistry.is_active.is_(True),
+                ModuleRegistry.status == "active",
             )
-        }
-
-    @staticmethod
-    def _calculate_veteran_benefit_value(
-        db: Session,
-        payload: dict[str, Any],
-        _requires_actor: bool,
-        _actor_id: UUID | None,
-    ) -> dict[str, Any]:
-
-        case_id = _payload_uuid(payload, "case_id")
-
-        return calculate_benefit_value(db, case_id=case_id)
-
-    @staticmethod
-    def _calculate_case_priority(
-        db: Session,
-        payload: dict[str, Any],
-        _requires_actor: bool,
-        _actor_id: UUID | None,
-    ) -> dict[str, Any]:
-
-        case_id = _payload_uuid(payload, "case_id")
-
-        return calculate_case_priority(db, case_id=case_id)
-
-    @staticmethod
-    def _analyze_property(
-        db: Session,
-        payload: dict[str, Any],
-        _requires_actor: bool,
-        _actor_id: UUID | None,
-    ) -> dict[str, Any]:
-
-        del db
-
-        equity = calculate_equity(
-            estimated_property_value=float(payload.get("estimated_property_value", 0)),
-            loan_balance=float(payload.get("loan_balance", 0)),
+            .all()
         )
 
-        ltv = calculate_ltv(
-            loan_balance=float(payload.get("loan_balance", 0)),
-            estimated_property_value=float(payload.get("estimated_property_value", 0)),
+        if not hasattr(self.app.state, "dynamic_module_routes"):
+            self.app.state.dynamic_module_routes = set()
+
+        loaded_count = 0
+
+        for module in active_modules:
+
+            route_key = f"{module.module_name}:{module.version}"
+
+            if route_key in self.app.state.dynamic_module_routes:
+                continue
+
+            self._register_module_router(module)
+
+            self.app.state.dynamic_module_routes.add(route_key)
+
+            loaded_count += 1
+
+        self.db.commit()
+
+        return loaded_count
+
+    def _register_module_router(self, module: ModuleRegistry) -> None:
+
+        router = APIRouter(
+            prefix=f"/modules/{module.module_name}",
+            tags=["dynamic-modules"],
         )
 
-        rescue_score = calculate_rescue_score(
-            arrears_amount=float(payload.get("arrears_amount", 0)),
-            homeowner_income=float(payload.get("homeowner_income", 0)),
-            foreclosure_stage=str(payload.get("foreclosure_stage", "pre_foreclosure")),
-        )
+        @router.post("/actions/{action_name}")
+        def invoke_module_action(
+            action_name: str,
+            request: ModuleActionRequest,
+            db: Session = Depends(get_db),
+            user: User = Depends(get_current_user),
+        ):
 
-        acquisition_score = calculate_acquisition_score(
-            equity=equity,
-            ltv=ltv,
-            foreclosure_stage=str(payload.get("foreclosure_stage", "pre_foreclosure")),
-        )
+            policy_authorizer = PolicyAuthorizer(db)
 
-        return {
-            "equity": equity,
-            "ltv": ltv,
-            "rescue_score": rescue_score,
-            "acquisition_score": acquisition_score,
-            "classification": classify_intervention(
-                rescue_score=rescue_score,
-                acquisition_score=acquisition_score,
-                ltv=ltv,
-            ),
-        }
+            if not request.case_id:
+                raise HTTPException(status_code=400, detail="case_id required")
 
-    @staticmethod
-    def _route_case_partner(
-        db: Session,
-        payload: dict[str, Any],
-        _requires_actor: bool,
-        actor_id: UUID | None,
-    ) -> dict[str, Any]:
+            policy_authorizer.require_case_action(
+                user=user,
+                case_id=request.case_id,
+                action=f"modules.{module.module_name}.{action_name}",
+            )
 
-        referral = route_case_to_partner(
-            db,
-            case_id=_payload_uuid(payload, "case_id"),
-            state=str(payload.get("state", "")),
-            routing_category=str(payload.get("routing_category", "nonprofit_support")),
-            actor_id=actor_id,
-        )
+            result = self.domain_broker.execute_action(
+                db,
+                module=module,
+                action_name=action_name,
+                payload=request.payload,
+                actor_id=user.id,
+            )
 
-        return {
-            "partner_referral_id": str(referral.id),
-            "status": referral.status,
-        }
+            db.add(
+                AuditLog(
+                    id=uuid4(),
+                    case_id=UUID(request.case_id),
+                    actor_id=user.id,
+                    actor_is_ai=False,
+                    action_type="module_action_invoked",
+                    reason_code=f"module_action:{module.module_name}:{action_name}",
+                    before_state={},
+                    after_state={"result": result},
+                    policy_version_id=None,
+                )
+            )
 
-    @staticmethod
-    def _add_property_to_portfolio(
-        db: Session,
-        payload: dict[str, Any],
-        _requires_actor: bool,
-        actor_id: UUID | None,
-    ) -> dict[str, Any]:
+            db.commit()
 
-        asset = add_property_to_portfolio(
-            db,
-            payload=payload,
-            actor_id=actor_id,
-        )
+            return result
 
-        return {"property_asset_id": str(asset.id)}
-
-    @staticmethod
-    def _portfolio_summary(
-        db: Session,
-        payload: dict[str, Any],
-        _requires_actor: bool,
-        _actor_id: UUID | None,
-    ) -> dict[str, Any]:
-
-        del payload
-
-        return calculate_portfolio_equity(db)
-
-    @staticmethod
-    def _create_membership_profile(
-        db: Session,
-        payload: dict[str, Any],
-        _requires_actor: bool,
-        actor_id: UUID | None,
-    ) -> dict[str, Any]:
-
-        profile = create_membership(
-            db,
-            user_id=_payload_uuid(payload, "user_id"),
-            case_id=_payload_uuid(payload, "case_id"),
-            membership_type=str(payload.get("membership_type", "cooperative")),
-            actor_id=actor_id,
-        )
-
-        return {"membership_profile_id": str(profile.id)}
+        self.app.include_router(router)
 
 
 def load_modules_on_startup(app: FastAPI) -> int:
+
     db = SessionLocal()
+
     try:
         return ModuleLoaderService(app, db).load_active_modules()
     finally:

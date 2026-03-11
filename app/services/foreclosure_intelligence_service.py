@@ -13,8 +13,13 @@ from app.models.policy_versions import PolicyVersion
 
 
 def create_foreclosure_profile(
-    db: Session, *, case_id: UUID | None, payload: dict, actor_id: UUID | None
+    db: Session,
+    *,
+    case_id: UUID | None,
+    payload: dict,
+    actor_id: UUID | None,
 ) -> dict:
+
     resolved_case_id = case_id or _auto_create_case(
         db,
         actor_id=actor_id,
@@ -202,7 +207,6 @@ def _auto_create_case(
     )
 
     db.add(case)
-
     db.flush()
 
     _audit(
