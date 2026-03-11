@@ -39,6 +39,7 @@ from api.routes import (
     essential_worker,
     lead_intelligence,
     mufasa_ai,
+    system_verify,
 )
 
 # -----------------------------------------------------
@@ -117,6 +118,7 @@ app.include_router(verify.router)
 app.include_router(essential_worker.router)
 app.include_router(lead_intelligence.router)
 app.include_router(mufasa_ai.router)
+app.include_router(system_verify.router)
 
 app.include_router(public_apply.router)
 app.include_router(system_admin.router)

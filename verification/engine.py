@@ -9,7 +9,7 @@ from app.models.system_verification import PhaseVerificationRun, SystemPhase
 from verification.phase1 import Phase1Verifier
 from verification.phase4 import Phase4Verifier
 from verification.phase5 import Phase5Verifier
-from verification.phase7 import Phase7Verifier
+from verification.phase7_ai_orchestration import Phase7Verifier
 from verification.phase6 import Phase6Verifier
 
 

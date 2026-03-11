@@ -8,7 +8,7 @@ from app.schemas.ai_orchestration import (
 )
 from app.services.ai_orchestration_service import (
     advisory_message,
-    execute_message,
+    handle_mufasa_prompt,
     process_voice,
 )
 from app.models.users import User, UserRole
@@ -43,11 +43,13 @@ def ai_execute(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role([UserRole.admin])),
 ):
-    return execute_message(
+    if request.confirm is not True:
+        return {"status": "blocked", "reason": "Execution requires confirm=true"}
+
+    return handle_mufasa_prompt(
+        prompt=request.message,
+        user_id=current_user.id,
         db=db,
-        message=request.message,
-        confirm=request.confirm,
-        user=current_user,
     )
 
 

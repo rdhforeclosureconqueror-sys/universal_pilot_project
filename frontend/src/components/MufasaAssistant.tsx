@@ -88,7 +88,6 @@ export const MufasaAssistant = () => {
 
   const sendPrompt = async (message: string) => {
     const trimmed = message.trim();
-
     if (!trimmed) return;
 
     pushMessage({

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import re
@@ -12,14 +11,17 @@ from sqlalchemy.orm import Session
 from ai.command_parser import parse_command
 from ai.context_builder import build_context
 from ai.operations_brain import build_advisory
-from ai.role_manager import AIRole, authorize, user_ai_role
 from ai.voice_interface import synthesize_audio, transcribe_audio
 
-from app.models.audit_logs import AuditLog
 from app.models.users import User
 from app.models.ai_command_logs import AICommandLog
 
-from internal.ai_gateway import execute_gateway_action
+from app.models.lead_intelligence import PropertyLead
+from app.models.housing_intelligence import ForeclosureCaseData
+from app.models.essential_worker import EssentialWorkerProfile
+from app.models.veteran_intelligence import VeteranProfile
+
+from app.services.platform_knowledge_service import PlatformKnowledgeService
 
 from app.services.veteran_intelligence_service import (
     get_advisory,
@@ -57,13 +59,6 @@ from app.services.skiptrace_service import (
     skiptrace_property_owner,
 )
 
-from app.services.platform_knowledge_service import PlatformKnowledgeService
-
-from app.models.lead_intelligence import PropertyLead
-from app.models.housing_intelligence import ForeclosureCaseData
-from app.models.essential_worker import EssentialWorkerProfile
-from app.models.veteran_intelligence import VeteranProfile
-
 
 def advisory_message(db: Session, message: str) -> dict:
     parsed = parse_command(message)
@@ -71,7 +66,7 @@ def advisory_message(db: Session, message: str) -> dict:
 
     if parsed.intent == "veteran_benefit_advisory":
         case_match = re.search(
-            r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}",
+            r"[0-9a-fA-F\-]{36}",
             message,
         )
 
@@ -84,13 +79,9 @@ def advisory_message(db: Session, message: str) -> dict:
                 )
                 response = advisory["answer"]
             except Exception:
-                response = (
-                    "Veteran advisory is available. Provide a valid case UUID."
-                )
+                response = "Veteran advisory available. Provide valid case UUID."
         else:
-            response = (
-                "Include the case UUID linked to the veteran profile."
-            )
+            response = "Include case UUID linked to veteran profile."
     else:
         response = build_advisory(message, parsed, context)
 
@@ -119,7 +110,12 @@ def process_voice(
     execution = None
 
     if advisory["execution_request"] and execution_allowed:
-        execution = {"status": "approved"}
+        execution = handle_mufasa_prompt(
+            prompt=transcript,
+            user_id=user.id,
+            db=db,
+        )
+
     elif advisory["execution_request"]:
         execution = {
             "status": "blocked",
@@ -136,66 +132,4 @@ def process_voice(
             "utf-8",
             errors="ignore",
         ),
-    }
-
-
-def handle_mufasa_question(
-    prompt: str,
-    db: Session,
-    *,
-    investor_mode: bool = False,
-) -> str:
-
-    knowledge = PlatformKnowledgeService(db)
-
-    overview = knowledge.get_platform_overview()
-
-    capabilities = knowledge.get_capability_summary()
-
-    modules = knowledge.get_module_descriptions()[:8]
-
-    if investor_mode:
-        return (
-            "This platform is an AI-enabled housing intervention operating system "
-            "designed for foreclosure prevention, lead intelligence, assistance discovery, "
-            "partner routing, and portfolio analytics."
-        )
-
-    return (
-        f"Platform overview: {overview}. "
-        f"Capability domains: {', '.join(capabilities.get('domains', []))}. "
-        f"Active modules loaded: {len(modules)}."
-    )
-
-
-def handle_mufasa_prompt(
-    prompt: str,
-    user_id: UUID,
-    db: Session,
-    *,
-    investor_mode: bool = False,
-) -> dict:
-
-    response = handle_mufasa_question(
-        prompt=prompt,
-        db=db,
-        investor_mode=investor_mode,
-    )
-
-    db.add(
-        AICommandLog(
-            user_id=user_id,
-            message=prompt,
-            ai_response=response,
-            actions_triggered=[],
-            results={},
-        )
-    )
-
-    db.commit()
-
-    return {
-        "response": response,
-        "actions_executed": [],
-        "results": {},
     }

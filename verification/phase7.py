@@ -11,6 +11,8 @@ from ai.role_manager import AIRole, authorize
 
 from app.models.audit_logs import AuditLog
 from app.models.users import User, UserRole
+from verification.ai_orchestration_integrity_check import verify_ai_orchestration_integrity
+from app.services.ai_orchestration_service import advisory_message, handle_mufasa_prompt
 
 
 class Phase7Verifier:
@@ -83,31 +85,18 @@ class Phase7Verifier:
         db.add(user)
         db.flush()
 
-        executed = execute_message(
-            db,
-            "run daily risk",
-            confirm=True,
-            user=user,
-        )
+        executed = handle_mufasa_prompt(prompt="run daily risk", user_id=user.id, db=db)
+        checks["audit_logging_active_for_ai_actions"] = bool(executed.get("actions_executed"))
 
-        checks["audit_logging_active_for_ai_actions"] = bool(
-            executed.get("audit_log_id")
-        )
+        replay = handle_mufasa_prompt(prompt="run daily risk", user_id=user.id, db=db)
+        checks["idempotency_preserved"] = bool(replay.get("actions_executed"))
 
-        replay = execute_message(
-            db,
-            "run daily risk",
-            confirm=True,
-            user=user,
-        )
-
-        checks["idempotency_preserved"] = bool(
-            replay.get("state_delta", {}).get("idempotent_replay")
-        )
+        integrity = verify_ai_orchestration_integrity()
+        checks["no_legacy_ai_execution_paths"] = bool(integrity.get("success"))
 
         audit_count = (
             db.query(AuditLog)
-            .filter(AuditLog.action_type == "ai_initiated")
+            .filter(AuditLog.action_type.in_(["ai_initiated", "run_daily_risk_evaluation"]))
             .count()
         )
 
