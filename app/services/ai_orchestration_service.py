@@ -1,12 +1,12 @@
-from fastapi import APIRouter, Depends, File, Form, UploadFile, HTTPException
+from fastapi import APIRouter, Depends, File, Form, UploadFile
 from sqlalchemy.orm import Session
 
-from app.schemas.ai_orchestration import AIExecuteRequest, AIMessageRequest, AIVoiceResponse
-from app.services.ai_orchestration_service import (
-    advisory_message,
-    process_voice,
-    handle_mufasa_prompt,
+from app.schemas.ai_orchestration import (
+    AIExecuteRequest,
+    AIMessageRequest,
+    AIVoiceResponse,
 )
+
 from app.models.users import User, UserRole
 from auth.dependencies import require_role
 from db.session import get_db
@@ -27,6 +27,9 @@ def ai_advisory(
     request: AIMessageRequest,
     db: Session = Depends(get_db),
 ):
+    # Lazy import to avoid circular import during startup
+    from app.services.ai_orchestration_service import advisory_message
+
     return advisory_message(db, request.message)
 
 
@@ -39,8 +42,9 @@ def ai_execute(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role([UserRole.admin])),
 ):
-    # execute_message was removed during orchestration refactor
-    # we now route execution through the orchestration engine
+    # Lazy import prevents circular dependency
+    from app.services.ai_orchestration_service import handle_mufasa_prompt
+
     return handle_mufasa_prompt(
         prompt=request.message,
         user_id=current_user.id,
@@ -74,6 +78,9 @@ async def ai_voice(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role([UserRole.admin])),
 ):
+    # Lazy import prevents circular dependency
+    from app.services.ai_orchestration_service import process_voice
+
     payload = await audio.read()
 
     return process_voice(
