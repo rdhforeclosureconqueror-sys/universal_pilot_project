@@ -64,3 +64,5 @@ from .housing_intelligence import ForeclosureCaseData, PartnerOrganization, Part
 from .essential_worker import EssentialWorkerProfile, EssentialWorkerBenefitMatch
 
 from .lead_intelligence import LeadSource, PropertyLead, LeadScore
+
+from .ai_command_logs import AICommandLog
