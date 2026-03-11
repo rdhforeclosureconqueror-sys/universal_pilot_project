@@ -1,4 +1,5 @@
 from pydantic import BaseModel
+from typing import List, Dict, Any
 
 
 class MufasaChatRequest(BaseModel):
@@ -8,8 +9,8 @@ class MufasaChatRequest(BaseModel):
 
 class MufasaChatResponse(BaseModel):
     response: str
-    actions_executed: list[str]
-    results: dict
+    actions_executed: List[str]
+    results: Dict[str, Any]
 
 
 class MufasaExplainResponse(BaseModel):
