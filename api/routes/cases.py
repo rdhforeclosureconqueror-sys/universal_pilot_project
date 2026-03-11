@@ -17,6 +17,25 @@ from app.services.workflow_engine import initialize_case_workflow, sync_case_wor
 router = APIRouter()
 
 
+def _resolve_allowed_meta_fields(policy_config: dict) -> list[str]:
+    return (
+        policy_config.get("allowed_meta_fields")
+        or policy_config.get("allowed_fields")
+        or policy_config.get("custom_fields")
+        or []
+    )
+
+
+def _validate_meta_fields_or_422(*, incoming_meta: dict, policy_config: dict) -> None:
+    allowed_fields = _resolve_allowed_meta_fields(policy_config)
+    for field in incoming_meta.keys():
+        if field not in allowed_fields:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Field '{field}' not allowed by policy",
+            )
+
+
 @router.post("/cases")
 def create_case(case_data: CaseCreateRequest, db: Session = Depends(get_db)):
     case_id = uuid4()
@@ -40,13 +59,7 @@ def create_case(case_data: CaseCreateRequest, db: Session = Depends(get_db)):
     incoming_meta = case_data.meta or {}
 
     # Validate allowed custom fields
-    custom_fields = policy.config_json.get("custom_fields", [])
-    for field in incoming_meta.keys():
-        if field not in custom_fields:
-            raise HTTPException(
-                status_code=422,
-                detail=f"Field '{field}' not allowed by policy",
-            )
+    _validate_meta_fields_or_422(incoming_meta=incoming_meta, policy_config=policy.config_json or {})
 
     # Dedupe check
     dedupe_key = policy.config_json.get("dedupe_check")

@@ -58,6 +58,10 @@ const pages = {
     title: "Data Tables",
     subtitle: "Live tables from BotOps and lead intelligence.",
   },
+  "admin-command-center": {
+    title: "Admin Command Center",
+    subtitle: "One-click access to platform capabilities and AI automation.",
+  },
 };
 
 const getApiBase = () => {
@@ -167,6 +171,10 @@ const chartSets = {
   data: [
     { title: "BotOps Throughput", subtitle: "Commands processed." },
     { title: "Command Backlog", subtitle: "Pending automation jobs." },
+  ],
+  "admin-command-center": [
+    { title: "Capability Coverage", subtitle: "System, lead, foreclosure, and AI actions." },
+    { title: "Automation Queue", subtitle: "Recent admin-run jobs and outcomes." },
   ],
 };
 
