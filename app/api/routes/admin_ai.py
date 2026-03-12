@@ -1,16 +1,12 @@
 from fastapi import APIRouter, Depends, File, Form, UploadFile
 from sqlalchemy.orm import Session
 
-from app.schemas.ai_orchestration import (
-    AIExecuteRequest,
-    AIMessageRequest,
-    AIVoiceResponse,
-)
-from app.services.ai_orchestration_service import (
-    advisory_message,
-    handle_mufasa_prompt,
-    process_voice,
-)
+from app.schemas.ai_orchestration import AIExecuteRequest, AIMessageRequest, AIVoiceResponse
+from app.services.ai_orchestration_service import advisory_message, handle_mufasa_prompt, process_voice
+from app.models.users import User, UserRole
+from auth.dependencies import require_role
+from db.session import get_db
+from verification.engine import VerificationEngine
 from app.models.users import User, UserRole
 from auth.dependencies import require_role
 from db.session import get_db
