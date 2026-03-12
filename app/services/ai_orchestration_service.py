@@ -82,7 +82,8 @@ def advisory_message(db: Session, message: str) -> dict:
                 response = "Veteran advisory available. Provide valid case UUID."
         else:
             response = "Include case UUID linked to veteran profile."
-     else:
+
+    else:
         response = build_advisory(message, parsed, context)
 
     return {
