@@ -6,7 +6,6 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.models.module_registry import ModuleRegistry
-from app.services.module_loader_service import DomainServiceBroker
 
 
 class PlatformKnowledgeService:
@@ -59,6 +58,8 @@ class PlatformKnowledgeService:
         return descriptions
 
     def _domain_service_registry(self) -> dict[str, list[str]]:
+        from app.services.module_loader_service import DomainServiceBroker
+
         broker = DomainServiceBroker()
         domains: dict[str, set[str]] = {
             "system": {"ai_orchestration_service", "module_registry_service", "module_loader_service", "escalation_service"},

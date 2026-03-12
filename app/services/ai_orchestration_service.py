@@ -38,7 +38,6 @@ from app.models.lead_intelligence import PropertyLead
 from app.models.housing_intelligence import ForeclosureCaseData
 from app.models.essential_worker import EssentialWorkerProfile
 from app.models.veteran_intelligence import VeteranProfile
-from app.services.platform_knowledge_service import PlatformKnowledgeService
 import os
 
 
@@ -108,6 +107,8 @@ def _is_system_action_prompt(prompt: str) -> bool:
 
 
 def handle_mufasa_question(prompt: str, db: Session, *, investor_mode: bool = False) -> str:
+    from app.services.platform_knowledge_service import PlatformKnowledgeService
+
     knowledge = PlatformKnowledgeService(db)
     overview = knowledge.get_platform_overview()
     capabilities = knowledge.get_capability_summary()
