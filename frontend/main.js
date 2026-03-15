@@ -1018,31 +1018,46 @@ const wireEvents = () => {
 };
 
 const initapp = async () => {
-  const page = window.location.hash.replace("#/", "");
-  setPage(page || "dashboard");
+  const page = window.location.hash.replace("#/", "") || "dashboard";
+
+  setPage(page);
   renderCharts();
+
   if (!apiBaseInput.value && window.__API_BASE_URL__) {
     apiBaseInput.value = window.__API_BASE_URL__;
   }
 
   let openApi = null;
+
   try {
     openApi = await fetchOpenApi();
     state.openApi = openApi;
-    const schemas = openApi.components?.schemas;
-    state.enums.caseStatus = extractEnum(schemas, "CaseStatus");
-    state.enums.documentType = extractEnum(schemas, "DocumentType");
-    state.enums.referralStatus = extractEnum(schemas, "ReferralStatus");
+
+    const schemas = openApi?.components?.schemas || {};
+
+    state.enums.caseStatus = extractEnum(schemas, "CaseStatus") || [];
+    state.enums.documentType = extractEnum(schemas, "DocumentType") || [];
+    state.enums.referralStatus = extractEnum(schemas, "ReferralStatus") || [];
 
     state.caseListAvailable = detectEndpoint(openApi, "/cases", "get");
     state.propertyEndpointsAvailable = detectPropertyEndpoints(openApi);
+
   } catch (error) {
-    document.getElementById("metric-cards").textContent =
-      "Unable to load OpenAPI schema. Check API base URL.";
+    console.error("OpenAPI load failed:", error);
+
+    const metrics = document.getElementById("metric-cards");
+    if (metrics) {
+      metrics.textContent =
+        "Unable to load OpenAPI schema. Check API base URL.";
+    }
+
+    state.enums.caseStatus = [];
+    state.enums.documentType = [];
+    state.enums.referralStatus = [];
   }
 
-  populateSelect("doc-type-select", state.enums.documentType);
-  populateSelect("case-status-filter", state.enums.caseStatus);
+  populateSelect("doc-type-select", state.enums.documentType || []);
+  populateSelect("case-status-filter", state.enums.caseStatus || []);
   populateSelect("ai-role-select", ["assistive", "advisory", "automated"]);
 
   updateMetrics();
@@ -1053,6 +1068,7 @@ const initapp = async () => {
   updatePropertyState();
   updateMapStatus();
   updatePropertyDetailState();
+};
 
   const referralList = document.getElementById("referral-status-list");
   clearElement(referralList);
