@@ -39,6 +39,7 @@
           <a href="#/audit" data-page="audit" class="nav-link">Audit & AI Logs</a>
           <a href="#/data" data-page="data" class="nav-link">Data Tables</a>
           <a href="/static/admin-dev.html" class="nav-link">Admin / Dev Console</a>
+          <a href="#/admin-command-center" data-page="admin-command-center" class="nav-link">Admin → Command Center</a>
         </nav>
         <div class="sidebar-footer">
           <label class="field">
@@ -59,6 +60,28 @@
       <button type="button" id="theme-toggle" class="ghost">Toggle Theme</button>
     </div>
   </header>
+
+
+  <section class="page" data-page="login">
+    <div class="grid two">
+      <div class="card" style="max-width: 520px;">
+        <h3>Admin Sign In</h3>
+        <p class="hint">Sign in to access admin endpoints and AI command actions.</p>
+        <form id="login-form">
+          <label class="field">
+            <span>Email</span>
+            <input type="email" name="email" required />
+          </label>
+          <label class="field">
+            <span>Password</span>
+            <input type="password" name="password" required />
+          </label>
+          <button type="submit" class="primary" id="login-submit">Sign In</button>
+        </form>
+        <pre class="response" id="login-response"></pre>
+      </div>
+    </div>
+  </section>
 
   <section class="page" data-page="dashboard">
     <div class="grid two">
@@ -113,8 +136,6 @@
     <!-- 📊 Charts Area -->
     <div class="chart-grid" data-charts="dashboard"></div>
   </section>
-</main>
-
 
         <section class="page" data-page="cases">
           <div class="grid two">
@@ -552,6 +573,25 @@
             </div>
           </div>
           <div class="chart-grid" data-charts="data"></div>
+        </section>
+
+        <section class="page" data-page="admin-command-center">
+          <div class="card full" style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <h3 style="margin: 0;">Admin Command Center</h3>
+              <p class="hint" style="margin: 6px 0 0;">One-click access to platform capabilities and AI automation.</p>
+            </div>
+            <button type="button" class="ghost" id="admin-logout">Logout</button>
+          </div>
+          <div class="grid two">
+            <div id="admin-capability-panels" class="admin-capability-grid"></div>
+            <aside class="card" id="admin-response-console">
+              <h3>Response Console</h3>
+              <p class="hint">Latest admin action responses appear here.</p>
+              <pre class="response" id="admin-response-output">Run an admin action to view API responses in the console.</pre>
+            </aside>
+          </div>
+          <div class="chart-grid" data-charts="admin-command-center"></div>
         </section>
       </main>
     </div>

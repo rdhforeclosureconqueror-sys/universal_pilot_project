@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, File, Form, UploadFile
 from sqlalchemy.orm import Session
 
 from app.schemas.ai_orchestration import AIExecuteRequest, AIMessageRequest, AIVoiceResponse
-from app.services.ai_orchestration_service import advisory_message, execute_message, process_voice
+from app.services.ai_orchestration_service import advisory_message, handle_mufasa_prompt, process_voice
 from app.models.users import User, UserRole
 from auth.dependencies import require_role
 from db.session import get_db
@@ -32,7 +32,9 @@ def ai_execute(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role([UserRole.admin])),
 ):
-    return execute_message(db, request.message, request.confirm, current_user)
+    if request.confirm is not True:
+        return {"status": "blocked", "reason": "Execution requires confirm=true"}
+    return handle_mufasa_prompt(prompt=request.message, user_id=current_user.id, db=db)
 
 
 @router.post(
