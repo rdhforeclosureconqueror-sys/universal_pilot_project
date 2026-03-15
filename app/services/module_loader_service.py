@@ -11,28 +11,23 @@ from sqlalchemy.orm import Session
 from app.models.audit_logs import AuditLog
 from app.models.module_registry import ModuleRegistry
 from app.models.users import User
-
-from app.services.module_registry_service import ModuleRegistryService
 from app.services.escalation_service import run_daily_risk_evaluation
 from app.services.foreclosure_intelligence_service import calculate_case_priority
-
-from app.services.property_analysis_service import (
-    calculate_acquisition_score,
-    calculate_equity,
-    calculate_ltv,
-    calculate_rescue_score,
-    classify_intervention,
-)
-
+from app.services.property_analysis_service import calculate_acquisition_score, calculate_equity, calculate_ltv, calculate_rescue_score, classify_intervention
 from app.services.partner_routing_service import route_case_to_partner
-
-from app.services.property_portfolio_service import (
-    add_property_to_portfolio,
-    calculate_portfolio_equity,
-)
-
+from app.services.property_portfolio_service import add_property_to_portfolio, calculate_portfolio_equity
 from app.services.membership_service import create_membership
-
+from app.services.veteran_intelligence_service import (
+    calculate_benefit_value,
+    generate_action_plan,
+    generate_documents,
+    get_advisory,
+    match_benefits,
+    partner_aggregate_report,
+    update_benefit_progress,
+    upsert_veteran_profile,
+)
+from app.services.module_registry_service import ModuleRegistryService
 from auth.authorization import PolicyAuthorizer
 from auth.dependencies import get_current_user
 from db.session import SessionLocal, get_db
@@ -172,49 +167,68 @@ class DomainServiceBroker:
         return run_daily_risk_evaluation(db)
 
     @staticmethod
-    def _calculate_case_priority(
-        db: Session,
-        payload: dict[str, Any],
-        _requires_actor: bool,
-        _actor_id: UUID | None,
-    ) -> dict[str, Any]:
+    def _upsert_veteran_profile(db: Session, payload: dict[str, Any], _requires_actor: bool, actor_id: UUID | None) -> dict[str, Any]:
+        profile = upsert_veteran_profile(db, actor_id=actor_id, payload=payload)
+        return {"case_id": str(profile.case_id), "disability_rating": profile.disability_rating}
 
+    @staticmethod
+    def _scan_veteran_benefits(db: Session, payload: dict[str, Any], _requires_actor: bool, _actor_id: UUID | None) -> dict[str, Any]:
         case_id = _payload_uuid(payload, "case_id")
+        return match_benefits(db, case_id=case_id)
 
+    @staticmethod
+    def _generate_veteran_action_plan(db: Session, payload: dict[str, Any], _requires_actor: bool, _actor_id: UUID | None) -> dict[str, Any]:
+        case_id = _payload_uuid(payload, "case_id")
+        return generate_action_plan(db, case_id=case_id)
+
+    @staticmethod
+    def _generate_veteran_documents(db: Session, payload: dict[str, Any], requires_actor: bool, actor_id: UUID | None) -> dict[str, Any]:
+        if requires_actor and actor_id is None:
+            raise HTTPException(status_code=400, detail="actor_id required")
+        case_id = _payload_uuid(payload, "case_id")
+        return generate_documents(db, case_id=case_id, actor_id=actor_id)
+
+    @staticmethod
+    def _update_benefit_progress(db: Session, payload: dict[str, Any], _requires_actor: bool, actor_id: UUID | None) -> dict[str, Any]:
+        case_id = _payload_uuid(payload, "case_id")
+        return update_benefit_progress(
+            db,
+            case_id=case_id,
+            benefit_name=payload.get("benefit_name", ""),
+            status=payload.get("status", "NOT_STARTED"),
+            status_notes=payload.get("status_notes"),
+            actor_id=actor_id,
+        )
+
+    @staticmethod
+    def _veteran_ai_advisory(db: Session, payload: dict[str, Any], _requires_actor: bool, _actor_id: UUID | None) -> dict[str, Any]:
+        case_id = _payload_uuid(payload, "case_id")
+        return get_advisory(db, case_id=case_id, question=payload.get("question", ""))
+
+    @staticmethod
+    def _veteran_partner_aggregate_report(db: Session, payload: dict[str, Any], _requires_actor: bool, _actor_id: UUID | None) -> dict[str, Any]:
+        return {"rows": partner_aggregate_report(db, state_of_residence=payload.get("state_of_residence"))}
+
+    @staticmethod
+    def _calculate_veteran_benefit_value(db: Session, payload: dict[str, Any], _requires_actor: bool, _actor_id: UUID | None) -> dict[str, Any]:
+        case_id = _payload_uuid(payload, "case_id")
+        return calculate_benefit_value(db, case_id=case_id)
+
+    @staticmethod
+    def _calculate_case_priority(db: Session, payload: dict[str, Any], _requires_actor: bool, _actor_id: UUID | None) -> dict[str, Any]:
+        case_id = _payload_uuid(payload, "case_id")
         return calculate_case_priority(db, case_id=case_id)
 
     @staticmethod
-    def _analyze_property(
-        db: Session,
-        payload: dict[str, Any],
-        _requires_actor: bool,
-        _actor_id: UUID | None,
-    ) -> dict[str, Any]:
-
-        del db
-
-        equity = calculate_equity(
-            estimated_property_value=float(payload.get("estimated_property_value", 0)),
-            loan_balance=float(payload.get("loan_balance", 0)),
-        )
-
-        ltv = calculate_ltv(
-            loan_balance=float(payload.get("loan_balance", 0)),
-            estimated_property_value=float(payload.get("estimated_property_value", 0)),
-        )
-
+    def _analyze_property(db: Session, payload: dict[str, Any], _requires_actor: bool, _actor_id: UUID | None) -> dict[str, Any]:
+        equity = calculate_equity(estimated_property_value=float(payload.get("estimated_property_value", 0)), loan_balance=float(payload.get("loan_balance", 0)))
+        ltv = calculate_ltv(loan_balance=float(payload.get("loan_balance", 0)), estimated_property_value=float(payload.get("estimated_property_value", 0)))
         rescue_score = calculate_rescue_score(
             arrears_amount=float(payload.get("arrears_amount", 0)),
             homeowner_income=float(payload.get("homeowner_income", 0)),
             foreclosure_stage=str(payload.get("foreclosure_stage", "pre_foreclosure")),
         )
-
-        acquisition_score = calculate_acquisition_score(
-            equity=equity,
-            ltv=ltv,
-            foreclosure_stage=str(payload.get("foreclosure_stage", "pre_foreclosure")),
-        )
-
+        acquisition_score = calculate_acquisition_score(equity=equity, ltv=ltv, foreclosure_stage=str(payload.get("foreclosure_stage", "pre_foreclosure")))
         return {
             "equity": equity,
             "ltv": ltv,
@@ -304,13 +318,9 @@ class ModuleLoaderService:
         self.domain_broker = DomainServiceBroker()
 
     def load_active_modules(self) -> int:
-
         active_modules = (
             self.db.query(ModuleRegistry)
-            .filter(
-                ModuleRegistry.is_active.is_(True),
-                ModuleRegistry.status == "active",
-            )
+            .filter(ModuleRegistry.is_active.is_(True), ModuleRegistry.status == "active")
             .all()
         )
 
@@ -364,13 +374,16 @@ class ModuleLoaderService:
 
             result = self.domain_broker.execute_action(
                 db,
-                module=module,
+                module=live_module,
                 action_name=action_name,
                 payload=request.payload,
                 actor_id=user.id,
             )
 
-            case_uuid = UUID(request.case_id)
+            try:
+                case_uuid = UUID(request.case_id)
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail="case_id must be a valid UUID") from exc
 
             db.add(
                 AuditLog(

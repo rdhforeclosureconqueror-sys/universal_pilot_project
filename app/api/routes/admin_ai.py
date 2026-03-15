@@ -7,10 +7,6 @@ from app.models.users import User, UserRole
 from auth.dependencies import require_role
 from db.session import get_db
 from verification.engine import VerificationEngine
-from app.models.users import User, UserRole
-from auth.dependencies import require_role
-from db.session import get_db
-from verification.engine import VerificationEngine
 
 
 router = APIRouter(prefix="/admin/ai", tags=["admin-ai"])
