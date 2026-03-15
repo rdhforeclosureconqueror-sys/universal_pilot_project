@@ -53,6 +53,33 @@ Key operator interfaces:
 4. Enable **Investor Mode** in Mufasa Assistant.
 5. Run “Run Investor Demo” to execute multi-step orchestration and narrate each output.
 
+## API Entry Points For AI Operations
+
+- `POST /admin/ai/mufasa/chat`: Executes action-oriented prompts or routes explanatory prompts through orchestration.
+- `POST /admin/ai/mufasa/explain`: Forces explanation mode for architecture/capability questions.
+
+Execution path for chat-driven actions:
+
+1. Admin UI (`MufasaAssistant`) sends prompt payload.
+2. API route (`api/routes/mufasa_ai.py`) enforces admin auth and invokes orchestration.
+3. `AIOrchestrationService.handle_mufasa_prompt` determines action vs question.
+4. Action path dispatches domain workflows (lead, foreclosure, skiptrace, worker housing, portfolio, etc.).
+5. Results and action traces are persisted to `ai_command_logs`.
+
+## Investor Demo Sequence (Current Behavior)
+
+When the prompt includes “run investor demo”, orchestration performs a bundled sequence:
+
+1. Foreclosure lead discovery scan.
+2. Lead scoring on discovered opportunities.
+3. Case creation from the top lead.
+4. Skiptrace/contact lookup for outreach.
+5. Essential worker profile + assistance discovery.
+6. Action plan generation.
+7. Portfolio/equity summary.
+
+This flow demonstrates one-prompt execution of cross-domain interventions with persisted command telemetry.
+
 ## Suggested Investor Questions
 
 - What problems does this platform solve in foreclosure prevention?

@@ -379,30 +379,61 @@ class ModuleLoaderService:
                     actor_id=user.id,
                     actor_is_ai=False,
                     action_type="module_action_invoked",
-                    reason_code=f"module_action:{module.module_name}:{action_name}",
+                    reason_code=f"module_action:{live_module.module_name}:{action_name}",
                     before_state={
-                        "module_name": module.module_name,
-                        "version": module.version,
+                        "module_name": live_module.module_name,
+                        "version": live_module.version,
                         "action": action_name,
                     },
                     after_state={"result": result},
                     policy_version_id=None,
                 )
             )
-
             db.commit()
 
-            return result
+            return {
+                "status": "success",
+                "module_name": live_module.module_name,
+                "version": live_module.version,
+                "action": action_name,
+                "result": result,
+            }
 
         self.app.include_router(router)
 
+    def _log_load_event(self, *, module: ModuleRegistry, reason_code: str, after_state: dict[str, Any]) -> None:
+        self.db.add(
+            AuditLog(
+                id=uuid4(),
+                case_id=None,
+                actor_id=None,
+                actor_is_ai=False,
+                action_type="module_loader",
+                reason_code=reason_code,
+                before_state={
+                    "module_name": module.module_name,
+                    "version": module.version,
+                    "status": module.status,
+                },
+                after_state=after_state,
+                policy_version_id=None,
+            )
+        )
+
 
 def load_modules_on_startup(app: FastAPI) -> int:
-
     db = SessionLocal()
-
     try:
         return ModuleLoaderService(app, db).load_active_modules()
-
     finally:
         db.close()
+
+
+def _payload_uuid(payload: dict[str, Any], field: str) -> UUID:
+    value = payload.get(field)
+    if not value:
+        raise HTTPException(status_code=400, detail=f"{field} is required")
+    try:
+        return UUID(str(value))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=f"{field} must be a valid UUID") from exc
