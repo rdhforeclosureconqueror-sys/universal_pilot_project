@@ -39,6 +39,7 @@
           <a href="#/audit" data-page="audit" class="nav-link">Audit & AI Logs</a>
           <a href="#/data" data-page="data" class="nav-link">Data Tables</a>
           <a href="/static/admin-dev.html" class="nav-link">Admin / Dev Console</a>
+          <a href="#/admin-command-center" data-page="admin-command-center" class="nav-link">Admin → Command Center</a>
         </nav>
         <div class="sidebar-footer">
           <label class="field">
@@ -113,8 +114,6 @@
     <!-- 📊 Charts Area -->
     <div class="chart-grid" data-charts="dashboard"></div>
   </section>
-</main>
-
 
         <section class="page" data-page="cases">
           <div class="grid two">
@@ -552,6 +551,18 @@
             </div>
           </div>
           <div class="chart-grid" data-charts="data"></div>
+        </section>
+
+        <section class="page" data-page="admin-command-center">
+          <div class="grid two">
+            <div id="admin-capability-panels" class="admin-capability-grid"></div>
+            <aside class="card" id="admin-response-console">
+              <h3>Response Console</h3>
+              <p class="hint">Latest admin action responses appear here.</p>
+              <pre class="response" id="admin-response-output">Run an admin action to view API responses in the console.</pre>
+            </aside>
+          </div>
+          <div class="chart-grid" data-charts="admin-command-center"></div>
         </section>
       </main>
     </div>
