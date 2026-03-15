@@ -1068,7 +1068,6 @@ const initapp = async () => {
   updatePropertyState();
   updateMapStatus();
   updatePropertyDetailState();
-};
 
   const referralList = document.getElementById("referral-status-list");
   clearElement(referralList);
@@ -1118,15 +1117,21 @@ const initapp = async () => {
     document.getElementById("leads-empty").textContent =
       "Unable to load BotOps tables. Check API connectivity.";
      }
-   const currentPage = window.location.hash.replace("#/", "");
+     const currentPage = window.location.hash.replace("#/", "");
   setPage(currentPage || "dashboard");
 };
 
 initapp().catch((error) => {
-  document.getElementById("metric-cards").textContent =
-    "Unable to initialize dashboard. Check API base URL.";
-  renderCharts();
-  setPage(window.location.hash.replace("#/", "") || "dashboard");
-  console.error(error);
-});
+  console.error("Application failed to initialize:", error);
 
+  const metrics = document.getElementById("metric-cards");
+  if (metrics) {
+    metrics.textContent =
+      "Unable to initialize dashboard. Check API base URL.";
+  }
+
+  renderCharts();
+
+  const fallbackPage = window.location.hash.replace("#/", "") || "dashboard";
+  setPage(fallbackPage);
+});
