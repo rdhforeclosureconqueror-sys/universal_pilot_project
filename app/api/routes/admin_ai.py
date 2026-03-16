@@ -12,6 +12,9 @@ from verification.engine import VerificationEngine
 router = APIRouter(prefix="/admin/ai", tags=["admin-ai"])
 
 
+# -----------------------------
+# AI Advisory (non-executing)
+# -----------------------------
 @router.post(
     "/advisory",
     dependencies=[Depends(require_role([UserRole.admin]))],
@@ -23,10 +26,10 @@ def ai_advisory(
     return advisory_message(db, request.message)
 
 
-@router.post(
-    "/execute",
-    dependencies=[Depends(require_role([UserRole.admin]))],
-)
+# -----------------------------
+# AI Execution (requires admin)
+# -----------------------------
+@router.post("/execute")
 def ai_execute(
     request: AIExecuteRequest,
     db: Session = Depends(get_db),
@@ -36,7 +39,16 @@ def ai_execute(
         return {"status": "blocked", "reason": "Execution requires confirm=true"}
     return handle_mufasa_prompt(prompt=request.message, user_id=current_user.id, db=db)
 
+    return handle_mufasa_prompt(
+        prompt=request.message,
+        user_id=current_user.id,
+        db=db,
+    )
 
+
+# -----------------------------
+# Phase 7 Verification
+# -----------------------------
 @router.post(
     "/phase7/verify",
     dependencies=[Depends(require_role([UserRole.admin]))],
@@ -47,9 +59,11 @@ def verify_phase7(
     return VerificationEngine(db).run_phase("phase7_ai_orchestration")
 
 
+# -----------------------------
+# Voice AI Interface
+# -----------------------------
 @router.post(
     "/voice",
-    dependencies=[Depends(require_role([UserRole.admin]))],
     response_model=AIVoiceResponse,
 )
 async def ai_voice(
@@ -59,4 +73,10 @@ async def ai_voice(
     current_user: User = Depends(require_role([UserRole.admin])),
 ):
     payload = await audio.read()
-    return process_voice(db, payload, confirm_phrase, current_user)
+
+    return process_voice(
+        db=db,
+        audio_bytes=payload,
+        confirm_phrase=confirm_phrase,
+        user=current_user,
+    )
