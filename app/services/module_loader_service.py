@@ -304,11 +304,11 @@ class ModuleLoaderService:
             self.app.state.dynamic_module_routes = set()
 
         loaded_count = 0
-
         for module in active_modules:
+            if not self._validate_spec(module):
+                continue
 
             route_key = f"{module.module_name}:{module.version}"
-
             if route_key in self.app.state.dynamic_module_routes:
                 continue
 

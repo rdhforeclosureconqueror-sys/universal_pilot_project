@@ -37,6 +37,7 @@ def ai_execute(
 ):
     if request.confirm is not True:
         return {"status": "blocked", "reason": "Execution requires confirm=true"}
+    return handle_mufasa_prompt(prompt=request.message, user_id=current_user.id, db=db)
 
     return handle_mufasa_prompt(
         prompt=request.message,
