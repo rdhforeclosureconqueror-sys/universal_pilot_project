@@ -41,3 +41,17 @@ def test_login_bad_password_returns_401(client, db_session):
         headers={"content-type": "application/x-www-form-urlencoded"},
     )
     assert token_resp.status_code == 401
+
+
+def test_login_with_json_payload(client, db_session):
+    email = f"json-login-{uuid4().hex[:8]}@example.com"
+    client.post("/auth/register", json={"email": email, "password": "secret123"})
+
+    token_resp = client.post(
+        "/auth/login",
+        json={"email": email, "password": "secret123"},
+    )
+    assert token_resp.status_code == 200
+    payload = token_resp.json()
+    assert payload["token_type"] == "bearer"
+    assert payload["access_token"]
