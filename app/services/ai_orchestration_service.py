@@ -257,9 +257,9 @@ def _execute_mufasa_actions(prompt: str, user_id: UUID, db: Session) -> tuple[li
 
             # Convert SQLAlchemy objects to JSON-safe values
             if hasattr(result, "id"):
-            results[name] = {"id": str(result.id)}
+                results[name] = {"id": str(result.id)}
             elif isinstance(result, dict):
-            results[name] = result
+                results[name] = result
             else:
                 results[name] = str(result)
 
