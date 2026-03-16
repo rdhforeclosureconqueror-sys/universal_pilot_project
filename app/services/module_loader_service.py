@@ -38,66 +38,42 @@ class ModuleActionRequest(BaseModel):
     payload: dict[str, Any] = Field(default_factory=dict)
 
 
-def _payload_uuid(payload: dict[str, Any], key: str) -> UUID:
-    value = payload.get(key)
-
-    if not value:
-        raise HTTPException(status_code=400, detail=f"{key} is required")
-
-    try:
-        return UUID(str(value))
-    except Exception as exc:
-        raise HTTPException(
-            status_code=400,
-            detail=f"{key} must be a UUID",
-        ) from exc
-
-
 class DomainServiceBroker:
-    """Dispatcher that safely maps module actions to platform services."""
+    """Bounded dispatcher for module actions using existing domain services only."""
 
-    def __init__(self) -> None:
-
-        self._handlers: dict[str, tuple[str, Callable[..., dict[str, Any]], bool]] = {
-            "run_daily_risk_evaluation": (
-                "escalation_service",
-                self._run_daily_risk_evaluation,
-                False,
-            ),
-            "calculate_case_priority": (
-                "foreclosure_intelligence_service",
-                self._calculate_case_priority,
-                True,
-            ),
-            "analyze_property": (
-                "property_analysis_service",
-                self._analyze_property,
-                True,
-            ),
-            "route_case_partner": (
-                "partner_routing_service",
-                self._route_case_partner,
-                True,
-            ),
-            "add_property_to_portfolio": (
-                "property_portfolio_service",
-                self._add_property_to_portfolio,
-                True,
-            ),
-            "portfolio_summary": (
-                "property_portfolio_service",
-                self._portfolio_summary,
-                True,
-            ),
-            "create_membership_profile": (
-                "membership_service",
-                self._create_membership_profile,
-                True,
-            ),
+    def __init__(self):
+        self._handlers: dict[str, tuple[str, Callable[[Session, dict[str, Any]], dict[str, Any], bool]]] = {
+            "run_daily_risk_evaluation": ("escalation_service", self._run_daily_risk_evaluation, False),
+            "upsert_veteran_profile": ("veteran_intelligence_service", self._upsert_veteran_profile, True),
+            "scan_veteran_benefits": ("veteran_intelligence_service", self._scan_veteran_benefits, True),
+            "generate_veteran_action_plan": ("veteran_intelligence_service", self._generate_veteran_action_plan, True),
+            "generate_veteran_documents": ("document_service", self._generate_veteran_documents, True),
+            "update_benefit_progress": ("veteran_intelligence_service", self._update_benefit_progress, True),
+            "veteran_ai_advisory": ("veteran_intelligence_service", self._veteran_ai_advisory, True),
+            "veteran_partner_aggregate_report": ("veteran_intelligence_service", self._veteran_partner_aggregate_report, False),
+            "calculate_veteran_benefit_value": ("veteran_intelligence_service", self._calculate_veteran_benefit_value, True),
+            "calculate_case_priority": ("foreclosure_intelligence_service", self._calculate_case_priority, True),
+            "analyze_property": ("property_analysis_service", self._analyze_property, True),
+            "route_case_partner": ("partner_routing_service", self._route_case_partner, True),
+            "add_property_to_portfolio": ("property_portfolio_service", self._add_property_to_portfolio, True),
+            "portfolio_summary": ("property_portfolio_service", self._portfolio_summary, True),
+            "create_membership_profile": ("membership_service", self._create_membership_profile, True),
         }
-
         self.allowed_services = {
+            "activation_service",
+            "admin_dashboard_service",
+            "ai_orchestration_service",
+            "application_service",
+            "auth_service",
             "escalation_service",
+            "member_dashboard_service",
+            "membership_service",
+            "payment_service",
+            "qualification_service",
+            "stability_service",
+            "workflow_service",
+            "document_service",
+            "veteran_intelligence_service",
             "foreclosure_intelligence_service",
             "property_analysis_service",
             "partner_routing_service",
@@ -337,21 +313,35 @@ class ModuleLoaderService:
                 continue
 
             self._register_module_router(module)
-
             self.app.state.dynamic_module_routes.add(route_key)
-
             loaded_count += 1
+            self._log_load_event(module=module, reason_code="module_loaded", after_state={"route_key": route_key})
 
         self.db.commit()
-
         return loaded_count
 
-    def _register_module_router(self, module: ModuleRegistry) -> None:
+    def _validate_spec(self, module: ModuleRegistry) -> bool:
+        validation_errors = self.registry_service._validation_errors(module)
 
-        router = APIRouter(
-            prefix=f"/modules/{module.module_name}",
-            tags=["dynamic-modules"],
-        )
+        services_ok, services_reason = self.domain_broker.validate_required_services(module.required_services or [])
+        if not services_ok:
+            validation_errors.append(services_reason)
+
+        if validation_errors:
+            module.status = "draft"
+            module.validation_errors = validation_errors
+            module.is_active = False
+            self._log_load_event(
+                module=module,
+                reason_code="module_load_rejected",
+                after_state={"errors": validation_errors},
+            )
+            return False
+
+        return True
+
+    def _register_module_router(self, module: ModuleRegistry) -> None:
+        router = APIRouter(prefix=f"/modules/{module.module_name}", tags=["dynamic-modules"])
 
         @router.post("/actions/{action_name}")
         def invoke_module_action(
@@ -359,17 +349,30 @@ class ModuleLoaderService:
             request: ModuleActionRequest,
             db: Session = Depends(get_db),
             user: User = Depends(get_current_user),
+            module_name: str = module.module_name,
+            module_version: str = module.version,
         ):
-
-            policy_authorizer = PolicyAuthorizer(db)
+            live_module = (
+                db.query(ModuleRegistry)
+                .filter(
+                    ModuleRegistry.module_name == module_name,
+                    ModuleRegistry.version == module_version,
+                    ModuleRegistry.is_active.is_(True),
+                    ModuleRegistry.status == "active",
+                )
+                .first()
+            )
+            if not live_module:
+                raise HTTPException(status_code=404, detail="Module is not active")
 
             if not request.case_id:
-                raise HTTPException(status_code=400, detail="case_id required")
+                raise HTTPException(status_code=400, detail="case_id is required for policy authorization")
 
+            policy_authorizer = PolicyAuthorizer(db)
             policy_authorizer.require_case_action(
                 user=user,
                 case_id=request.case_id,
-                action=f"modules.{module.module_name}.{action_name}",
+                action=f"modules.{live_module.module_name}.{action_name}",
             )
 
             result = self.domain_broker.execute_action(

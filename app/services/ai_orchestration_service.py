@@ -65,24 +65,15 @@ def advisory_message(db: Session, message: str) -> dict:
     context = build_context(db)
 
     if parsed.intent == "veteran_benefit_advisory":
-        case_match = re.search(
-            r"[0-9a-fA-F\-]{36}",
-            message,
-        )
-
+        case_match = re.search(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}", message)
         if case_match:
             try:
-                advisory = get_advisory(
-                    db,
-                    case_id=UUID(case_match.group(0)),
-                    question=message,
-                )
+                advisory = get_advisory(db, case_id=UUID(case_match.group(0)), question=message)
                 response = advisory["answer"]
             except Exception:
-                response = "Veteran advisory available. Provide valid case UUID."
+                response = "Veteran advisory is available. Please provide a valid case UUID tied to a veteran profile for precise eligibility results."
         else:
-            response = "Include case UUID linked to veteran profile."
-
+            response = "To answer veteran eligibility questions precisely, include the case UUID linked to the veteran profile."
     else:
         response = build_advisory(message, parsed, context)
 
