@@ -1298,31 +1298,46 @@ const wireEvents = () => {
 };
 
 const initapp = async () => {
-  const page = window.location.hash.replace("#/", "");
-  setPage(page || "dashboard");
+  const page = window.location.hash.replace("#/", "") || "dashboard";
+
+  setPage(page);
   renderCharts();
+
   if (!apiBaseInput.value && window.__API_BASE_URL__) {
     apiBaseInput.value = window.__API_BASE_URL__;
   }
 
   let openApi = null;
+
   try {
     openApi = await fetchOpenApi();
     state.openApi = openApi;
-    const schemas = openApi.components?.schemas;
-    state.enums.caseStatus = extractEnum(schemas, "CaseStatus");
-    state.enums.documentType = extractEnum(schemas, "DocumentType");
-    state.enums.referralStatus = extractEnum(schemas, "ReferralStatus");
+
+    const schemas = openApi?.components?.schemas || {};
+
+    state.enums.caseStatus = extractEnum(schemas, "CaseStatus") || [];
+    state.enums.documentType = extractEnum(schemas, "DocumentType") || [];
+    state.enums.referralStatus = extractEnum(schemas, "ReferralStatus") || [];
 
     state.caseListAvailable = detectEndpoint(openApi, "/cases", "get");
     state.propertyEndpointsAvailable = detectPropertyEndpoints(openApi);
+
   } catch (error) {
-    document.getElementById("metric-cards").textContent =
-      "Unable to load OpenAPI schema. Check API base URL.";
+    console.error("OpenAPI load failed:", error);
+
+    const metrics = document.getElementById("metric-cards");
+    if (metrics) {
+      metrics.textContent =
+        "Unable to load OpenAPI schema. Check API base URL.";
+    }
+
+    state.enums.caseStatus = [];
+    state.enums.documentType = [];
+    state.enums.referralStatus = [];
   }
 
-  populateSelect("doc-type-select", state.enums.documentType);
-  populateSelect("case-status-filter", state.enums.caseStatus);
+  populateSelect("doc-type-select", state.enums.documentType || []);
+  populateSelect("case-status-filter", state.enums.caseStatus || []);
   populateSelect("ai-role-select", ["assistive", "advisory", "automated"]);
 
   updateMetrics();
@@ -1383,15 +1398,21 @@ const initapp = async () => {
     document.getElementById("leads-empty").textContent =
       "Unable to load BotOps tables. Check API connectivity.";
      }
-   const currentPage = window.location.hash.replace("#/", "");
+     const currentPage = window.location.hash.replace("#/", "");
   setPage(currentPage || "dashboard");
 };
 
 initapp().catch((error) => {
-  document.getElementById("metric-cards").textContent =
-    "Unable to initialize dashboard. Check API base URL.";
-  renderCharts();
-  setPage(window.location.hash.replace("#/", "") || "dashboard");
-  console.error(error);
-});
+  console.error("Application failed to initialize:", error);
 
+  const metrics = document.getElementById("metric-cards");
+  if (metrics) {
+    metrics.textContent =
+      "Unable to initialize dashboard. Check API base URL.";
+  }
+
+  renderCharts();
+
+  const fallbackPage = window.location.hash.replace("#/", "") || "dashboard";
+  setPage(fallbackPage);
+});

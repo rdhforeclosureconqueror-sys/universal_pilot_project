@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from ai.command_parser import parse_command
 from ai.operations_brain import personality_loaded
 from ai.role_manager import AIRole, authorize
+
 from app.models.audit_logs import AuditLog
 from app.models.users import User, UserRole
 from verification.ai_orchestration_integrity_check import verify_ai_orchestration_integrity
@@ -19,7 +20,14 @@ class Phase7Verifier:
 
     def _no_direct_db_paths(self) -> bool:
         ai_dir = Path("ai")
-        forbidden = ["sqlalchemy", "app.models", "Session(", ".query("]
+
+        forbidden = [
+            "sqlalchemy",
+            "app.models",
+            "Session(",
+            ".query(",
+        ]
+
         for file in [
             ai_dir / "council_prompt.py",
             ai_dir / "operations_brain.py",
@@ -29,21 +37,43 @@ class Phase7Verifier:
             ai_dir / "voice_interface.py",
         ]:
             text = file.read_text()
+
             if any(token in text for token in forbidden):
                 return False
+
         return True
 
     def verify(self, db: Session, environment: str) -> dict:
+
+        # Lazy imports prevent circular dependency during startup
+        from app.services.ai_orchestration_service import (
+            advisory_message,
+            execute_message,
+        )
+
         checks: dict[str, bool] = {}
 
         checks["gateway_reachable"] = True
-        checks["role_manager_active"] = authorize(AIRole.OPERATE, AIRole.INFRA)
+
+        checks["role_manager_active"] = authorize(
+            AIRole.OPERATE,
+            AIRole.INFRA,
+        )
+
         checks["council_personality_loaded"] = personality_loaded()
-        checks["command_parsing_functional"] = parse_command("run daily risk").intent == "run_daily_risk_evaluation"
+
+        checks["command_parsing_functional"] = (
+            parse_command("run daily risk").intent
+            == "run_daily_risk_evaluation"
+        )
+
         checks["no_direct_db_access_paths"] = self._no_direct_db_paths()
 
         advisory = advisory_message(db, "What is current risk posture?")
-        checks["advisory_works"] = bool(advisory.get("advisory_response"))
+
+        checks["advisory_works"] = bool(
+            advisory.get("advisory_response")
+        )
 
         user = User(
             id=uuid4(),
@@ -51,6 +81,7 @@ class Phase7Verifier:
             hashed_password="x",
             role=UserRole.admin,
         )
+
         db.add(user)
         db.flush()
 

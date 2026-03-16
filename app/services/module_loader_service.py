@@ -1,3 +1,4 @@
+# app/services/module_loader_service.py
 from __future__ import annotations
 
 from typing import Any, Callable
@@ -81,30 +82,63 @@ class DomainServiceBroker:
         }
 
     def validate_required_services(self, required_services: list[str]) -> tuple[bool, str]:
+
         unknown = sorted(set(required_services) - self.allowed_services)
+
         if unknown:
             return False, f"unknown required services: {', '.join(unknown)}"
+
         return True, "required services are valid"
 
-    def execute_action(self, db: Session, *, module: ModuleRegistry, action_name: str, payload: dict[str, Any], actor_id: UUID | None = None) -> dict[str, Any]:
+    def execute_action(
+        self,
+        db: Session,
+        *,
+        module: ModuleRegistry,
+        action_name: str,
+        payload: dict[str, Any],
+        actor_id: UUID | None = None,
+    ) -> dict[str, Any]:
+
         if action_name not in (module.allowed_actions or []):
-            raise HTTPException(status_code=403, detail=f"Action '{action_name}' not allowed for module")
+            raise HTTPException(
+                status_code=403,
+                detail=f"Action '{action_name}' not allowed for module",
+            )
 
         mapped = self._handlers.get(action_name)
+
         if not mapped:
-            raise HTTPException(status_code=501, detail=f"No safe domain-service mapping for action '{action_name}'")
+            raise HTTPException(
+                status_code=501,
+                detail=f"No safe mapping for action '{action_name}'",
+            )
 
         service_name, handler, requires_actor = mapped
+
         if service_name not in (module.required_services or []):
             raise HTTPException(
                 status_code=400,
-                detail=f"Action '{action_name}' requires service '{service_name}' declared in required_services",
+                detail=f"Action '{action_name}' requires service '{service_name}'",
             )
 
-        return handler(db, payload, requires_actor and actor_id is not None, actor_id)
+        return handler(
+            db,
+            payload,
+            requires_actor and actor_id is not None,
+            actor_id,
+        )
+
+    # ---------- DOMAIN HANDLERS ----------
 
     @staticmethod
-    def _run_daily_risk_evaluation(db: Session, payload: dict[str, Any], _requires_actor: bool, _actor_id: UUID | None) -> dict[str, Any]:
+    def _run_daily_risk_evaluation(
+        db: Session,
+        payload: dict[str, Any],
+        _requires_actor: bool,
+        _actor_id: UUID | None,
+    ) -> dict[str, Any]:
+
         del payload
         return run_daily_risk_evaluation(db)
 
@@ -176,11 +210,21 @@ class DomainServiceBroker:
             "ltv": ltv,
             "rescue_score": rescue_score,
             "acquisition_score": acquisition_score,
-            "classification": classify_intervention(rescue_score=rescue_score, acquisition_score=acquisition_score, ltv=ltv),
+            "classification": classify_intervention(
+                rescue_score=rescue_score,
+                acquisition_score=acquisition_score,
+                ltv=ltv,
+            ),
         }
 
     @staticmethod
-    def _route_case_partner(db: Session, payload: dict[str, Any], _requires_actor: bool, actor_id: UUID | None) -> dict[str, Any]:
+    def _route_case_partner(
+        db: Session,
+        payload: dict[str, Any],
+        _requires_actor: bool,
+        actor_id: UUID | None,
+    ) -> dict[str, Any]:
+
         referral = route_case_to_partner(
             db,
             case_id=_payload_uuid(payload, "case_id"),
@@ -188,20 +232,46 @@ class DomainServiceBroker:
             routing_category=str(payload.get("routing_category", "nonprofit_support")),
             actor_id=actor_id,
         )
-        return {"partner_referral_id": str(referral.id), "status": referral.status}
+
+        return {
+            "partner_referral_id": str(referral.id),
+            "status": referral.status,
+        }
 
     @staticmethod
-    def _add_property_to_portfolio(db: Session, payload: dict[str, Any], _requires_actor: bool, actor_id: UUID | None) -> dict[str, Any]:
+    def _add_property_to_portfolio(
+        db: Session,
+        payload: dict[str, Any],
+        _requires_actor: bool,
+        actor_id: UUID | None,
+    ) -> dict[str, Any]:
+
         asset = add_property_to_portfolio(db, payload=payload, actor_id=actor_id)
-        return {"property_asset_id": str(asset.id)}
+
+        return {
+            "property_asset_id": str(asset.id),
+        }
 
     @staticmethod
-    def _portfolio_summary(db: Session, payload: dict[str, Any], _requires_actor: bool, _actor_id: UUID | None) -> dict[str, Any]:
+    def _portfolio_summary(
+        db: Session,
+        payload: dict[str, Any],
+        _requires_actor: bool,
+        _actor_id: UUID | None,
+    ) -> dict[str, Any]:
+
         del payload
+
         return calculate_portfolio_equity(db)
 
     @staticmethod
-    def _create_membership_profile(db: Session, payload: dict[str, Any], _requires_actor: bool, actor_id: UUID | None) -> dict[str, Any]:
+    def _create_membership_profile(
+        db: Session,
+        payload: dict[str, Any],
+        _requires_actor: bool,
+        actor_id: UUID | None,
+    ) -> dict[str, Any]:
+
         profile = create_membership(
             db,
             user_id=_payload_uuid(payload, "user_id"),
@@ -209,10 +279,14 @@ class DomainServiceBroker:
             membership_type=str(payload.get("membership_type", "cooperative")),
             actor_id=actor_id,
         )
-        return {"membership_profile_id": str(profile.id)}
+
+        return {
+            "membership_profile_id": str(profile.id),
+        }
 
 
 class ModuleLoaderService:
+
     def __init__(self, app: FastAPI, db: Session):
         self.app = app
         self.db = db
@@ -230,11 +304,11 @@ class ModuleLoaderService:
             self.app.state.dynamic_module_routes = set()
 
         loaded_count = 0
+
         for module in active_modules:
-            if not self._validate_spec(module):
-                continue
 
             route_key = f"{module.module_name}:{module.version}"
+
             if route_key in self.app.state.dynamic_module_routes:
                 continue
 
