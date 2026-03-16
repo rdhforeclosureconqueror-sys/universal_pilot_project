@@ -251,19 +251,20 @@ def _execute_mufasa_actions(prompt: str, user_id: UUID, db: Session) -> tuple[li
     response_fragments: list[str] = []
 
     def run_action(name: str, fn):
-    try:
-        result = fn()
-        actions_executed.append(name)
+        try:
+            result = fn()
+            actions_executed.append(name)
 
-        # Convert SQLAlchemy objects to JSON-safe values
-        if hasattr(result, "id"):
+            # Convert SQLAlchemy objects to JSON-safe values
+            if hasattr(result, "id"):
             results[name] = {"id": str(result.id)}
-        elif isinstance(result, dict):
+            elif isinstance(result, dict):
             results[name] = result
-        else:
-            results[name] = str(result)
+            else:
+                results[name] = str(result)
 
-        return result
+            return result
+        
         except Exception as exc:
             actions_executed.append(name)
             results[name] = {"error": str(exc)}
