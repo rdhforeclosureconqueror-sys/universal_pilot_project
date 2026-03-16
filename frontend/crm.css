@@ -138,6 +138,22 @@ body {
   grid-column: 1 / -1;
 }
 
+.admin-capability-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+.admin-capability-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-action-button {
+  width: 100%;
+  text-align: left;
+}
+
 .table-card {
   display: flex;
   flex-direction: column;

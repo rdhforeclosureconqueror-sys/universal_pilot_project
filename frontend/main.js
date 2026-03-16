@@ -10,14 +10,28 @@ const state = {
   caseListAvailable: false,
   mapInstance: null,
   detailMapInstance: null,
+  propertyList: [],
+  adminActionHistory: [],
 };
 
 const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const apiBaseInput = document.getElementById("api-base");
+const AUTH_TOKEN_KEY = "auth_token";
+
+const getAuthToken = () => localStorage.getItem(AUTH_TOKEN_KEY) || "";
+
+const clearAuthToken = () => {
+  localStorage.removeItem(AUTH_TOKEN_KEY);
+};
+
 
 const pages = {
+  login: {
+    title: "Admin Sign In",
+    subtitle: "Authenticate to access admin tools.",
+  },
   dashboard: {
     title: "Operator Dashboard",
     subtitle: "Status-aware overview of your operations.",
@@ -57,6 +71,10 @@ const pages = {
   data: {
     title: "Data Tables",
     subtitle: "Live tables from BotOps and lead intelligence.",
+  },
+  "admin-command-center": {
+    title: "Admin Command Center",
+    subtitle: "One-click access to platform capabilities and AI automation.",
   },
 };
 
@@ -168,6 +186,202 @@ const chartSets = {
     { title: "BotOps Throughput", subtitle: "Commands processed." },
     { title: "Command Backlog", subtitle: "Pending automation jobs." },
   ],
+  "admin-command-center": [
+    { title: "Capability Coverage", subtitle: "System, lead, foreclosure, and AI actions." },
+    { title: "Automation Queue", subtitle: "Recent admin-run jobs and outcomes." },
+  ],
+};
+
+const devPropertyFallback = {
+  id: "dev-property-101-elm",
+  address: "101 Elm St",
+  city: "Dallas",
+  state: "TX",
+  zip: "75201",
+  case_status: "new",
+  latitude: 32.7767,
+  longitude: -96.797,
+  loan_type: "Conventional",
+};
+
+const adminCapabilitySections = [
+  {
+    title: "System Operations",
+    actions: [
+      { label: "Verify System Health", endpoint: "/admin/system/verify/phase10", method: "POST", payload: {} },
+      { label: "Run Policy Engine Diagnostics", endpoint: "/verify/policy-engine", method: "GET" },
+      { label: "View Impact Summary", endpoint: "/impact/summary", method: "GET" },
+    ],
+  },
+  {
+    title: "Lead Intelligence",
+    actions: [
+      { label: "Ingest Leads", endpoint: "/leads/intelligence/ingest", method: "POST", payload: { source_name: "mufasa", source_type: "ai", leads: [{ property_address: "101 Elm St", city: "Dallas", state: "TX", foreclosure_stage: "pre_foreclosure" }] } },
+      { label: "Score Leads", endpoint: "/admin/ai/mufasa/chat", method: "POST", payload: { prompt: "score leads" } },
+    ],
+  },
+  {
+    title: "Foreclosure Intelligence",
+    actions: [
+      { label: "Create Foreclosure Profile", endpoint: "/foreclosure/create-profile", method: "POST", payload: { property_id: "demo-property", owner_name: "Demo Owner" } },
+      { label: "Analyze Property", endpoint: "/foreclosure/analyze-property", method: "POST", payload: { estimated_value: 350000, estimated_mortgage_balance: 280000, months_delinquent: 5, auction_days_out: 18 } },
+    ],
+  },
+  {
+    title: "Skiptrace",
+    actions: [{ label: "Run Skiptrace Integration Check", endpoint: "/verify/skiptrace-integration", method: "GET" }],
+  },
+  {
+    title: "Essential Worker Housing",
+    actions: [
+      { label: "Create Worker Profile", endpoint: "/essential-worker/profile", method: "POST", payload: { worker_id: "worker-demo", occupation: "Teacher", annual_income: 68000, city: "Dallas", state: "TX" } },
+      { label: "Discover Programs", endpoint: "/essential-worker/discover-benefits", method: "POST", payload: { worker_id: "worker-demo" } },
+    ],
+  },
+  {
+    title: "Veteran Intelligence",
+    actions: [{ label: "Discover Veteran Benefits", endpoint: "/admin/ai/mufasa/chat", method: "POST", payload: { prompt: "discover veteran benefits" } }],
+  },
+  {
+    title: "Partner Routing",
+    actions: [{ label: "Route Case To Partner", endpoint: "/partners/route-case", method: "POST", payload: { case_id: "00000000-0000-0000-0000-000000000000", partner_id: "partner-demo", routing_reason: "demo" } }],
+  },
+  {
+    title: "Portfolio",
+    actions: [{ label: "View Portfolio Summary", endpoint: "/portfolio/summary", method: "GET" }],
+  },
+  {
+    title: "Training",
+    actions: [{ label: "System Training Overview", endpoint: "/training/system-overview", method: "GET" }],
+  },
+  {
+    title: "AI Command Center",
+    actions: [
+      { label: "Show Platform Capabilities", endpoint: "/admin/ai/mufasa/chat", method: "POST", payload: { prompt: "show platform capabilities" } },
+      { label: "Run Investor Demo", endpoint: "/admin/ai/mufasa/chat", method: "POST", payload: { prompt: "run investor demo", investor_mode: true } },
+    ],
+  },
+];
+
+const renderAdminResponseConsole = () => {
+  const output = document.getElementById("admin-response-output");
+  if (!output) {
+    return;
+  }
+  if (!state.adminActionHistory.length) {
+    output.textContent = "Run an admin action to view API responses in the console.";
+    return;
+  }
+  output.textContent = JSON.stringify(state.adminActionHistory, null, 2);
+};
+
+const executeAdminAction = async (action) => {
+  const headers = { "Content-Type": "application/json" };
+  const token = getAuthToken();
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${getApiBase()}${action.endpoint}`, {
+    method: action.method,
+    headers,
+    body: action.method === "POST" ? JSON.stringify(action.payload || {}) : undefined,
+  });
+
+  let payload;
+  try {
+    payload = await response.json();
+  } catch (error) {
+    payload = await response.text();
+  }
+
+  const entry = {
+    timestamp: new Date().toISOString(),
+    action: action.label,
+    endpoint: action.endpoint,
+    method: action.method,
+    ok: response.ok,
+    status: response.status,
+    payload,
+  };
+
+  state.adminActionHistory = [entry, ...state.adminActionHistory].slice(0, 50);
+  renderAdminResponseConsole();
+
+  if (response.status === 401) {
+    clearAuthToken();
+    window.location.hash = "#/login";
+  }
+};
+
+const renderAdminCommandCenter = () => {
+  const container = document.getElementById("admin-capability-panels");
+  if (!container) {
+    return;
+  }
+  clearElement(container);
+
+  adminCapabilitySections.forEach((section) => {
+    const card = document.createElement("article");
+    card.className = "card";
+
+    const title = document.createElement("h3");
+    title.textContent = section.title;
+
+    const actionsContainer = document.createElement("div");
+    actionsContainer.className = "admin-capability-actions";
+
+    section.actions.forEach((action) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "ghost admin-action-button";
+      button.textContent = action.label;
+      button.addEventListener("click", async () => {
+        button.disabled = true;
+        try {
+          await executeAdminAction(action);
+        } catch (error) {
+          state.adminActionHistory = [
+            {
+              timestamp: new Date().toISOString(),
+              action: action.label,
+              endpoint: action.endpoint,
+              method: action.method,
+              ok: false,
+              status: "network_error",
+              payload: String(error),
+            },
+            ...state.adminActionHistory,
+          ].slice(0, 50);
+          renderAdminResponseConsole();
+        } finally {
+          button.disabled = false;
+        }
+      });
+      actionsContainer.appendChild(button);
+    });
+
+    card.append(title, actionsContainer);
+    container.appendChild(card);
+  });
+
+  renderAdminResponseConsole();
+};
+
+const getRenderableProperties = (properties) => {
+  if (Array.isArray(properties) && properties.length > 0) {
+    return properties;
+  }
+  return [devPropertyFallback];
+};
+
+const applyPropertyPlaceholders = () => {
+  document.getElementById("property-list-state").textContent =
+    "No properties available yet. Import auction CSV data to begin.";
+  document.getElementById("map-empty-state").textContent =
+    "No properties available yet. Import auction CSV data to begin.";
+  document.getElementById("property-detail-empty").textContent =
+    "No properties available yet. Import auction CSV data to begin.";
 };
 
 const renderCharts = () => {
@@ -200,8 +414,19 @@ const formatTimestamp = (value) => {
   return Number.isNaN(date.getTime()) ? "—" : date.toLocaleString();
 };
 
+const ensureAdminAuth = (pageKey) => {
+  if (pageKey !== "admin-command-center") {
+    return pageKey;
+  }
+  if (getAuthToken()) {
+    return pageKey;
+  }
+  return "login";
+};
+
 const setPage = (pageId) => {
-  const pageKey = pageId in pages ? pageId : "dashboard";
+  const requestedPage = pageId in pages ? pageId : "dashboard";
+  const pageKey = ensureAdminAuth(requestedPage);
   document.querySelectorAll(".page").forEach((page) => {
     page.classList.toggle("active", page.dataset.page === pageKey);
   });
@@ -597,19 +822,39 @@ const renderMapPins = (map, properties) => {
 };
 
 const loadProperties = async (mapInstance) => {
-  if (!state.propertyEndpointsAvailable) {
-    return;
+  let properties = [];
+  if (state.propertyEndpointsAvailable) {
+    properties = await fetchJson(`${getApiBase()}/properties/`);
   }
-  const properties = await fetchJson(`${getApiBase()}/properties/`);
-  renderPropertiesTable(properties);
-  renderMapPins(mapInstance, properties);
+
+  const renderableProperties = getRenderableProperties(properties);
+  state.propertyList = renderableProperties;
+  renderPropertiesTable(renderableProperties);
+  renderMapPins(mapInstance, renderableProperties);
+
+  if (!properties.length) {
+    applyPropertyPlaceholders();
+  }
+
+  const detailFormInput = document.querySelector("#property-detail-form input[name='property_id']");
+  if (detailFormInput && renderableProperties[0]?.id) {
+    detailFormInput.value = renderableProperties[0].id;
+  }
+  await loadPropertyDetail(renderableProperties[0]?.id, state.detailMapInstance);
 };
 
 const loadPropertyDetail = async (propertyId, mapInstance) => {
-  if (!state.propertyEndpointsAvailable || !propertyId) {
+  if (!propertyId) {
     return;
   }
-  const detail = await fetchJson(`${getApiBase()}/properties/${propertyId}`);
+
+  let detail = null;
+  if (state.propertyEndpointsAvailable) {
+    detail = await fetchJson(`${getApiBase()}/properties/${propertyId}`);
+  } else {
+    detail = state.propertyList.find((property) => property.id === propertyId) || devPropertyFallback;
+  }
+
   const container = document.getElementById("property-detail");
   clearElement(container);
   container.append(
@@ -621,6 +866,7 @@ const loadPropertyDetail = async (propertyId, mapInstance) => {
   if (mapInstance && detail.latitude && detail.longitude) {
     mapInstance.setView([detail.latitude, detail.longitude], 14);
     L.marker([detail.latitude, detail.longitude]).addTo(mapInstance);
+    document.getElementById("property-map-empty").textContent = "";
   }
 };
 
@@ -987,6 +1233,11 @@ const wireEvents = () => {
       document.body.classList.toggle("theme-dark");
     });
 
+  document.getElementById("api-base").addEventListener("change", () => {
+    state.adminActionHistory = [];
+    renderAdminResponseConsole();
+  });
+
   document.querySelectorAll("input, textarea, select").forEach((el) => {
     el.addEventListener("input", updateValidation);
   });
@@ -1002,6 +1253,43 @@ const wireEvents = () => {
       const propertyId = event.target.property_id.value.trim();
       loadPropertyDetail(propertyId, state.detailMapInstance);
     });
+
+
+  document.getElementById("login-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = event.target;
+    const response = await fetch(`${getApiBase()}/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: form.email.value.trim(),
+        password: form.password.value,
+      }),
+    });
+
+    let payload = null;
+    try {
+      payload = await response.json();
+    } catch (error) {
+      payload = { detail: "Unable to parse login response" };
+    }
+
+    if (!response.ok || !payload?.access_token) {
+      document.getElementById("login-response").textContent =
+        payload?.detail || "Login failed.";
+      clearAuthToken();
+      return;
+    }
+
+    localStorage.setItem(AUTH_TOKEN_KEY, payload.access_token);
+    document.getElementById("login-response").textContent = "";
+    window.location.hash = "#/admin-command-center";
+  });
+
+  document.getElementById("admin-logout").addEventListener("click", () => {
+    clearAuthToken();
+    window.location.hash = "#/login";
+  });
 
   window.addEventListener("hashchange", () => {
     const page = window.location.hash.replace("#/", "");
@@ -1045,6 +1333,7 @@ const initapp = async () => {
   updatePropertyState();
   updateMapStatus();
   updatePropertyDetailState();
+  renderAdminCommandCenter();
 
   const referralList = document.getElementById("referral-status-list");
   clearElement(referralList);

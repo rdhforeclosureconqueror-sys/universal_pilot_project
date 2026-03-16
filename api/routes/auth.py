@@ -27,6 +27,12 @@ class CreateAdminRequest(BaseModel):
     admin_secret: str | None = None
 
 
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
 class AssumeRoleRequest(BaseModel):
     role_name: str
     case_id: str | None = None
@@ -56,6 +62,12 @@ def create_admin(request: CreateAdminRequest, db: Session = Depends(get_db)):
         "email": user.email,
         "role": user.role.value if user.role else None,
     }
+
+
+
+@router.post("/login", response_model=Token)
+def login_with_json(request: LoginRequest, db: Session = Depends(get_db)):
+    return AuthService(db).login(username=request.email, password=request.password)
 
 
 @router.post("/token", response_model=Token)
