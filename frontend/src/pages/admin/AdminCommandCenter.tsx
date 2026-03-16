@@ -1,8 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { AdminActionButton } from "../../components/AdminActionButton";
 import { MufasaAssistant } from "../../components/MufasaAssistant";
-import { HttpMethod } from "../../services/apiClient";
+import { clearAuthToken, getAuthToken, HttpMethod } from "../../services/apiClient";
 
 type ActionConfig = {
   label: string;
@@ -176,6 +176,17 @@ const capabilitySections: SectionConfig[] = [
 const AdminCommandCenter = () => {
   const [history, setHistory] = useState<unknown[]>([]);
 
+  useEffect(() => {
+    if (!getAuthToken()) {
+      window.location.hash = "#/login";
+    }
+  }, []);
+
+  const handleLogout = () => {
+    clearAuthToken();
+    window.location.hash = "#/login";
+  };
+
   const panelOutput = useMemo(() => {
     if (!history.length) {
       return "Run an admin action to view API responses in the console.";
@@ -184,40 +195,22 @@ const AdminCommandCenter = () => {
   }, [history]);
 
   return (
-    <div
-      className="admin-command-center"
-      style={{
-        display: "grid",
-        gridTemplateColumns: "2fr 1fr",
-        gap: 20,
-      }}
-    >
+    <div className="admin-command-center" style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 20 }}>
       <div>
-        <h1>Admin Command Center</h1>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+          <h1 style={{ margin: 0 }}>Admin Command Center</h1>
+          <button type="button" onClick={handleLogout}>Logout</button>
+        </div>
         <p>Execute platform capabilities by section. All actions call backend APIs directly.</p>
-
         <MufasaAssistant />
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-            gap: 16,
-            marginTop: 16,
-          }}
-        >
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16, marginTop: 16 }}>
           {capabilitySections.map((section) => (
             <article
               key={section.title}
-              style={{
-                border: "1px solid #d7deeb",
-                borderRadius: 10,
-                padding: 14,
-                background: "#ffffff",
-              }}
+              style={{ border: "1px solid #d7deeb", borderRadius: 10, padding: 14, background: "#ffffff" }}
             >
               <h3>{section.title}</h3>
-
               <div style={{ display: "grid", gap: 8 }}>
                 {section.actions.map((action) => (
                   <AdminActionButton

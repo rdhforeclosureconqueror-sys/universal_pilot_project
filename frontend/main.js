@@ -18,8 +18,20 @@ const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const apiBaseInput = document.getElementById("api-base");
+const AUTH_TOKEN_KEY = "auth_token";
+
+const getAuthToken = () => localStorage.getItem(AUTH_TOKEN_KEY) || "";
+
+const clearAuthToken = () => {
+  localStorage.removeItem(AUTH_TOKEN_KEY);
+};
+
 
 const pages = {
+  login: {
+    title: "Admin Sign In",
+    subtitle: "Authenticate to access admin tools.",
+  },
   dashboard: {
     title: "Operator Dashboard",
     subtitle: "Status-aware overview of your operations.",
@@ -264,9 +276,15 @@ const renderAdminResponseConsole = () => {
 };
 
 const executeAdminAction = async (action) => {
+  const headers = { "Content-Type": "application/json" };
+  const token = getAuthToken();
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
   const response = await fetch(`${getApiBase()}${action.endpoint}`, {
     method: action.method,
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: action.method === "POST" ? JSON.stringify(action.payload || {}) : undefined,
   });
 
@@ -289,6 +307,11 @@ const executeAdminAction = async (action) => {
 
   state.adminActionHistory = [entry, ...state.adminActionHistory].slice(0, 50);
   renderAdminResponseConsole();
+
+  if (response.status === 401) {
+    clearAuthToken();
+    window.location.hash = "#/login";
+  }
 };
 
 const renderAdminCommandCenter = () => {
@@ -391,8 +414,19 @@ const formatTimestamp = (value) => {
   return Number.isNaN(date.getTime()) ? "—" : date.toLocaleString();
 };
 
+const ensureAdminAuth = (pageKey) => {
+  if (pageKey !== "admin-command-center") {
+    return pageKey;
+  }
+  if (getAuthToken()) {
+    return pageKey;
+  }
+  return "login";
+};
+
 const setPage = (pageId) => {
-  const pageKey = pageId in pages ? pageId : "dashboard";
+  const requestedPage = pageId in pages ? pageId : "dashboard";
+  const pageKey = ensureAdminAuth(requestedPage);
   document.querySelectorAll(".page").forEach((page) => {
     page.classList.toggle("active", page.dataset.page === pageKey);
   });
@@ -1219,6 +1253,43 @@ const wireEvents = () => {
       const propertyId = event.target.property_id.value.trim();
       loadPropertyDetail(propertyId, state.detailMapInstance);
     });
+
+
+  document.getElementById("login-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = event.target;
+    const response = await fetch(`${getApiBase()}/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: form.email.value.trim(),
+        password: form.password.value,
+      }),
+    });
+
+    let payload = null;
+    try {
+      payload = await response.json();
+    } catch (error) {
+      payload = { detail: "Unable to parse login response" };
+    }
+
+    if (!response.ok || !payload?.access_token) {
+      document.getElementById("login-response").textContent =
+        payload?.detail || "Login failed.";
+      clearAuthToken();
+      return;
+    }
+
+    localStorage.setItem(AUTH_TOKEN_KEY, payload.access_token);
+    document.getElementById("login-response").textContent = "";
+    window.location.hash = "#/admin-command-center";
+  });
+
+  document.getElementById("admin-logout").addEventListener("click", () => {
+    clearAuthToken();
+    window.location.hash = "#/login";
+  });
 
   window.addEventListener("hashchange", () => {
     const page = window.location.hash.replace("#/", "");
