@@ -73,6 +73,16 @@ def read_root():
     return FileResponse(frontend_dir / "index.html")
 
 
+@app.get("/help/foreclosure")
+def foreclosure_help_page():
+    return FileResponse(frontend_dir / "foreclosure-help.html")
+
+
+@app.get("/admin/workspaces/foreclosure")
+def foreclosure_workspace_page():
+    return FileResponse(frontend_dir / "foreclosure-workspace.html")
+
+
 @app.get("/styles.css")
 def read_styles():
     return FileResponse(frontend_dir / "styles.css")

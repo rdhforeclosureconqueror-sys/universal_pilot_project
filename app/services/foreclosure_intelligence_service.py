@@ -18,12 +18,14 @@ def create_foreclosure_profile(
     case_id: UUID | None,
     payload: dict,
     actor_id: UUID | None,
+    case_meta: dict | None = None,
 ) -> dict:
 
     resolved_case_id = case_id or _auto_create_case(
         db,
         actor_id=actor_id,
         payload=payload,
+        case_meta=case_meta,
     )
 
     profile = (
@@ -176,6 +178,7 @@ def _auto_create_case(
     *,
     actor_id: UUID | None,
     payload: dict,
+    case_meta: dict | None = None,
 ) -> UUID:
 
     policy = (
@@ -191,18 +194,29 @@ def _auto_create_case(
             detail="No active policy available to initialize case",
         )
 
+    resolved_actor_id = actor_id or _resolve_case_actor_id(db)
+    if not resolved_actor_id:
+        raise HTTPException(
+            status_code=400,
+            detail="No available system actor to initialize foreclosure case",
+        )
+
+    merged_meta = {
+        "property_address": payload.get("property_address"),
+        "city": payload.get("city"),
+        "state": payload.get("state"),
+        "origin": "foreclosure_create_profile",
+    }
+    if case_meta:
+        merged_meta.update(case_meta)
+
     case = Case(
         status=CaseStatus.intake_submitted,
-        created_by=actor_id,
+        created_by=resolved_actor_id,
         program_type=policy.program_key,
         program_key=policy.program_key,
         case_type="foreclosure_intelligence",
-        meta={
-            "property_address": payload.get("property_address"),
-            "city": payload.get("city"),
-            "state": payload.get("state"),
-            "origin": "foreclosure_create_profile",
-        },
+        meta=merged_meta,
         policy_version_id=policy.id,
     )
 
@@ -221,3 +235,10 @@ def _auto_create_case(
     )
 
     return case.id
+
+
+def _resolve_case_actor_id(db: Session) -> UUID | None:
+    from app.models.users import User
+
+    user = db.query(User).order_by(User.created_at.asc()).first()
+    return user.id if user else None

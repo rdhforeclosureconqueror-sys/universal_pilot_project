@@ -20,10 +20,17 @@ class ForeclosureCreateRequest(BaseModel):
     occupancy_status: Optional[str] = None
     homeowner_income: Optional[float] = 0
     homeowner_hardship_reason: Optional[str] = None
+    full_name: Optional[str] = None
+    contact_email: Optional[str] = None
+    phone: Optional[str] = None
+    consent_acknowledged: Optional[bool] = False
+    timeline_notes: Optional[str] = None
+    lead_id: Optional[UUID] = None
+    program_key: Optional[str] = None
 
 
 class ForeclosureAnalyzeRequest(BaseModel):
-    case_id: UUID
+    case_id: Optional[UUID] = None
     estimated_property_value: float
     loan_balance: float
     arrears_amount: float
