@@ -19,6 +19,8 @@ const uuidPattern =
 
 const apiBaseInput = document.getElementById("api-base");
 const AUTH_TOKEN_KEY = "auth_token";
+const TOUR_COMPLETED_KEY = "guided_tour_completed_v1";
+const TOUR_DISMISSED_KEY = "guided_tour_dismissed_v1";
 
 const getAuthToken = () => localStorage.getItem(AUTH_TOKEN_KEY) || "";
 
@@ -137,7 +139,7 @@ const TOUR_STEPS = [
     id: "tour-replay",
     target: '[data-tour="tour-replay-button"]',
     title: "Replay the Tour",
-    body: "Use this button any time you want a quick refresher of the platform layout.",
+    body: "You're ready to use the system. Use this button any time you want a quick refresher of the platform layout.",
     page: "dashboard",
     optional: false,
     skipIfMissing: true,
@@ -152,6 +154,18 @@ const createGuidedTourController = ({ setPageFn, getCurrentPageFn }) => {
     completionState: "idle",
   };
 
+  const markCompleted = () => {
+    localStorage.setItem(TOUR_COMPLETED_KEY, "true");
+    localStorage.removeItem(TOUR_DISMISSED_KEY);
+  };
+
+  const markDismissed = () => {
+    if (localStorage.getItem(TOUR_COMPLETED_KEY) === "true") {
+      return;
+    }
+    localStorage.setItem(TOUR_DISMISSED_KEY, "true");
+  };
+
   const overlay = document.createElement("div");
   overlay.className = "tour-overlay hidden";
   overlay.setAttribute("aria-hidden", "true");
@@ -162,7 +176,7 @@ const createGuidedTourController = ({ setPageFn, getCurrentPageFn }) => {
       <p class="tour-body"></p>
       <div class="tour-controls">
         <button type="button" class="ghost tour-prev">Back</button>
-        <button type="button" class="ghost tour-close">Close</button>
+        <button type="button" class="ghost tour-close">Skip Tour</button>
         <button type="button" class="primary tour-next">Next</button>
       </div>
     </div>
@@ -299,15 +313,21 @@ const createGuidedTourController = ({ setPageFn, getCurrentPageFn }) => {
   };
 
   const stop = ({ markComplete = false } = {}) => {
+    const wasRunning = state.running;
     state.running = false;
     overlay.classList.add("hidden");
     overlay.setAttribute("aria-hidden", "true");
     clearHighlight();
     if (markComplete) {
       state.completionState = "completed";
-    } else if (state.completionState !== "completed") {
-      state.completionState = "dismissed";
+      markCompleted();
+      return;
     }
+    if (!wasRunning || state.completionState === "completed") {
+      return;
+    }
+    state.completionState = "dismissed";
+    markDismissed();
   };
 
   const restart = async () => {
@@ -324,11 +344,6 @@ const createGuidedTourController = ({ setPageFn, getCurrentPageFn }) => {
   closeButton.addEventListener("click", () => {
     stop({ markComplete: false });
   });
-  overlay.addEventListener("click", (event) => {
-    if (event.target === overlay) {
-      stop({ markComplete: false });
-    }
-  });
 
   return {
     start,
@@ -339,6 +354,11 @@ const createGuidedTourController = ({ setPageFn, getCurrentPageFn }) => {
     complete: () => stop({ markComplete: true }),
     resolveTarget,
     getState: () => ({ ...state }),
+    canAutoStart: () => {
+      const completed = localStorage.getItem(TOUR_COMPLETED_KEY) === "true";
+      const dismissed = localStorage.getItem(TOUR_DISMISSED_KEY) === "true";
+      return !completed && !dismissed;
+    },
   };
 };
 
@@ -354,6 +374,46 @@ const getApiBase = () => {
 const getCurrentPageFromHash = () => window.location.hash.replace("#/", "") || "dashboard";
 
 let guidedTourController = null;
+let autoTourAttempted = false;
+
+const isNonLoginDashboardRoute = (page) =>
+  Boolean(page && page !== "login" && pages[page]);
+
+const waitForTourLaunchReadiness = async ({ page, attempts = 15 } = {}) => {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const activePage = document.querySelector(`.page.active[data-page="${page}"]`);
+    if (activePage) {
+      return true;
+    }
+    await new Promise((resolve) => window.setTimeout(resolve, 80));
+  }
+  return false;
+};
+
+const maybeAutoStartGuidedTour = async () => {
+  if (autoTourAttempted || !guidedTourController) {
+    return;
+  }
+
+  const token = getAuthToken();
+  const currentPage = getCurrentPageFromHash();
+  if (!token || !isNonLoginDashboardRoute(currentPage)) {
+    return;
+  }
+
+  if (!guidedTourController.canAutoStart()) {
+    autoTourAttempted = true;
+    return;
+  }
+
+  const isReady = await waitForTourLaunchReadiness({ page: currentPage });
+  if (!isReady) {
+    return;
+  }
+
+  autoTourAttempted = true;
+  await guidedTourController.start();
+};
 
 const fetchOpenApi = async () => {
   const response = await fetch(`${getApiBase()}/openapi.json`);
@@ -1569,6 +1629,9 @@ const wireEvents = () => {
   window.addEventListener("hashchange", () => {
     const page = window.location.hash.replace("#/", "");
     setPage(page || "dashboard");
+    window.setTimeout(() => {
+      maybeAutoStartGuidedTour();
+    }, 120);
   });
 };
 
@@ -1679,9 +1742,11 @@ const initapp = async () => {
   } catch (error) {
     document.getElementById("leads-empty").textContent =
       "Unable to load BotOps tables. Check API connectivity.";
-     }
-     const currentPage = window.location.hash.replace("#/", "");
+  }
+
+  const currentPage = window.location.hash.replace("#/", "");
   setPage(currentPage || "dashboard");
+  await maybeAutoStartGuidedTour();
 };
 
 initapp().catch((error) => {
