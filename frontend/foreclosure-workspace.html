@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Foreclosure Workspace</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <style>
+    .layout { display: grid; grid-template-columns: 320px 1fr 320px; gap: 16px; }
+    .list-item { padding: 10px; border: 1px solid #d9e2ec; border-radius: 10px; margin-bottom: 8px; cursor: pointer; }
+    .list-item.active { border-color: #1f7aec; background: #f0f7ff; }
+    .pill { font-size: 12px; border: 1px solid #cbd2d9; border-radius: 999px; padding: 2px 8px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Foreclosure Workspace (Operator MVP)</h1>
+    <p>List → detail → actions workflow for active foreclosure cases.</p>
+  </header>
+
+  <section class="card">
+    <label class="field" style="max-width: 520px;">
+      <span>Operator bearer token</span>
+      <input id="token" placeholder="Paste access token from /auth/login" />
+    </label>
+    <button class="primary" id="load-cases">Load Foreclosure Cases</button>
+  </section>
+
+  <section class="layout">
+    <article class="card">
+      <h3>Case List</h3>
+      <div id="case-list"></div>
+    </article>
+
+    <article class="card">
+      <h3>Case Detail</h3>
+      <div id="case-detail">Select a case to view property info, stage, and financial snapshot.</div>
+      <h4>Audit / Compliance</h4>
+      <ul id="audit"></ul>
+    </article>
+
+    <article class="card">
+      <h3>Actions</h3>
+      <form id="analyze-form">
+        <label class="field"><span>Estimated value</span><input name="estimated_property_value" type="number" step="0.01" required /></label>
+        <label class="field"><span>Loan balance</span><input name="loan_balance" type="number" step="0.01" required /></label>
+        <label class="field"><span>Arrears</span><input name="arrears_amount" type="number" step="0.01" required /></label>
+        <label class="field"><span>Income</span><input name="homeowner_income" type="number" step="0.01" /></label>
+        <label class="field"><span>Stage</span><input name="foreclosure_stage" required /></label>
+        <button class="primary" type="submit">Analyze Property</button>
+      </form>
+      <button class="ghost" id="next-step">Trigger Next Step</button>
+      <div class="response" id="action-response"></div>
+    </article>
+  </section>
+
+<script>
+  let selectedCaseId = null;
+  const listEl = document.getElementById('case-list');
+
+  function authHeaders() {
+    const token = document.getElementById('token').value.trim();
+    return { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` };
+  }
+
+  async function loadCases() {
+    const response = await fetch('/foreclosure/workspace/cases', { headers: authHeaders() });
+    const payload = await response.json();
+    listEl.innerHTML = '';
+    payload.forEach((row) => {
+      const item = document.createElement('div');
+      item.className = 'list-item';
+      item.innerHTML = `<strong>${row.property_address}</strong><br/><span class="pill">${row.foreclosure_stage || 'unknown stage'}</span><br/><small>${row.city || ''}, ${row.state || ''}</small>`;
+      item.addEventListener('click', () => selectCase(row.case_id, item));
+      listEl.appendChild(item);
+    });
+  }
+
+  async function selectCase(caseId, itemEl) {
+    selectedCaseId = caseId;
+    document.querySelectorAll('.list-item').forEach((el) => el.classList.remove('active'));
+    itemEl.classList.add('active');
+
+    const response = await fetch(`/foreclosure/workspace/cases/${caseId}`, { headers: authHeaders() });
+    const payload = await response.json();
+    const p = payload.profile || {};
+    document.getElementById('case-detail').innerHTML = `
+      <strong>Property:</strong> ${p.property_address || '—'}, ${p.city || '—'}, ${p.state || '—'}<br/>
+      <strong>Foreclosure stage:</strong> ${p.foreclosure_stage || '—'}<br/>
+      <strong>Loan balance:</strong> ${p.loan_balance ?? '—'}<br/>
+      <strong>Estimated value:</strong> ${p.estimated_property_value ?? '—'}<br/>
+      <strong>Arrears:</strong> ${p.arrears_amount ?? '—'}<br/>
+      <strong>Income:</strong> ${p.homeowner_income ?? '—'}<br/>
+      <strong>Lead linkage:</strong> ${(payload.meta || {}).lead_id || 'none'}
+    `;
+    document.querySelector('#analyze-form [name="estimated_property_value"]').value = p.estimated_property_value || '';
+    document.querySelector('#analyze-form [name="loan_balance"]').value = p.loan_balance || '';
+    document.querySelector('#analyze-form [name="arrears_amount"]').value = p.arrears_amount || '';
+    document.querySelector('#analyze-form [name="homeowner_income"]').value = p.homeowner_income || '';
+    document.querySelector('#analyze-form [name="foreclosure_stage"]').value = p.foreclosure_stage || 'pre_foreclosure';
+
+    const auditEl = document.getElementById('audit');
+    auditEl.innerHTML = '';
+    (payload.audit_log || []).forEach((a) => {
+      const li = document.createElement('li');
+      li.textContent = `${a.created_at || '—'} — ${a.action_type} (${a.reason_code})`;
+      auditEl.appendChild(li);
+    });
+  }
+
+  document.getElementById('load-cases').addEventListener('click', loadCases);
+
+  document.getElementById('analyze-form').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (!selectedCaseId) return;
+    const data = Object.fromEntries(new FormData(event.target).entries());
+    ["estimated_property_value", "loan_balance", "arrears_amount", "homeowner_income"].forEach((f) => {
+      if (data[f] !== '') data[f] = Number(data[f]); else delete data[f];
+    });
+    data.case_id = selectedCaseId;
+    const response = await fetch(`/foreclosure/workspace/cases/${selectedCaseId}/actions/analyze`, {
+      method: 'POST', headers: authHeaders(), body: JSON.stringify(data),
+    });
+    const payload = await response.json();
+    document.getElementById('action-response').textContent = `Classification: ${payload.classification || '—'} | Rescue Score: ${payload.rescue_score ?? '—'} | Acquisition Score: ${payload.acquisition_score ?? '—'}`;
+  });
+
+  document.getElementById('next-step').addEventListener('click', async () => {
+    if (!selectedCaseId) return;
+    const response = await fetch(`/foreclosure/workspace/cases/${selectedCaseId}/actions/next-step`, {
+      method: 'POST', headers: authHeaders(),
+    });
+    const payload = await response.json();
+    document.getElementById('action-response').textContent = `Next stage: ${payload.next_stage || '—'}. Partner referral status: ${payload.partner_referral_status || '—'}.`;
+    await loadCases();
+  });
+</script>
+</body>
+</html>
