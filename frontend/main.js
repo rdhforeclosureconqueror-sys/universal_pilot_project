@@ -169,26 +169,31 @@ const createGuidedTourController = ({ setPageFn, getCurrentPageFn }) => {
   const overlay = document.createElement("div");
   overlay.className = "tour-overlay hidden";
   overlay.setAttribute("aria-hidden", "true");
-  overlay.innerHTML = `
-    <div class="tour-popover" role="dialog" aria-modal="true" aria-live="polite">
-      <div class="tour-step-count"></div>
-      <h3 class="tour-title"></h3>
-      <p class="tour-body"></p>
-      <div class="tour-controls">
-        <button type="button" class="ghost tour-prev">Back</button>
-        <button type="button" class="ghost tour-close">Skip Tour</button>
-        <button type="button" class="primary tour-next">Next</button>
-      </div>
-    </div>
-  `;
   document.body.appendChild(overlay);
 
-  const stepCount = overlay.querySelector(".tour-step-count");
-  const title = overlay.querySelector(".tour-title");
-  const body = overlay.querySelector(".tour-body");
-  const prevButton = overlay.querySelector(".tour-prev");
-  const nextButton = overlay.querySelector(".tour-next");
-  const closeButton = overlay.querySelector(".tour-close");
+  const popover = document.createElement("div");
+  popover.className = "tour-popover hidden";
+  popover.setAttribute("role", "dialog");
+  popover.setAttribute("aria-modal", "true");
+  popover.setAttribute("aria-live", "polite");
+  popover.innerHTML = `
+    <div class="tour-step-count"></div>
+    <h3 class="tour-title"></h3>
+    <p class="tour-body"></p>
+    <div class="tour-controls">
+      <button type="button" class="ghost tour-prev">Back</button>
+      <button type="button" class="ghost tour-close">Skip Tour</button>
+      <button type="button" class="primary tour-next">Next</button>
+    </div>
+  `;
+  document.body.appendChild(popover);
+
+  const stepCount = popover.querySelector(".tour-step-count");
+  const title = popover.querySelector(".tour-title");
+  const body = popover.querySelector(".tour-body");
+  const prevButton = popover.querySelector(".tour-prev");
+  const nextButton = popover.querySelector(".tour-next");
+  const closeButton = popover.querySelector(".tour-close");
 
   let highlightedElement = null;
 
@@ -257,6 +262,37 @@ const createGuidedTourController = ({ setPageFn, getCurrentPageFn }) => {
     nextButton.textContent = stepIndex >= state.steps.length - 1 ? "Finish" : "Next";
   };
 
+  const positionPopover = (target) => {
+    if (!target) {
+      return;
+    }
+    const popoverRect = popover.getBoundingClientRect();
+    const targetRect = target.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const margin = 16;
+
+    let left = targetRect.left + targetRect.width / 2 - popoverRect.width / 2;
+    left = Math.min(
+      Math.max(margin, left),
+      Math.max(margin, viewportWidth - popoverRect.width - margin),
+    );
+
+    const spaceAbove = targetRect.top - margin;
+    const spaceBelow = viewportHeight - targetRect.bottom - margin;
+    const prefersAbove = spaceAbove >= popoverRect.height + margin || spaceAbove > spaceBelow;
+
+    const top = prefersAbove
+      ? Math.max(margin, targetRect.top - popoverRect.height - margin)
+      : Math.min(
+          viewportHeight - popoverRect.height - margin,
+          targetRect.bottom + margin,
+        );
+
+    popover.style.top = `${top}px`;
+    popover.style.left = `${left}px`;
+  };
+
   const activateStep = async (requestedIndex) => {
     if (!state.running) {
       return;
@@ -290,6 +326,7 @@ const createGuidedTourController = ({ setPageFn, getCurrentPageFn }) => {
 
     state.currentStepIndex = requestedIndex;
     updatePopoverForStep(step, requestedIndex);
+    positionPopover(target);
   };
 
   const start = async ({ restart = false } = {}) => {
@@ -301,6 +338,7 @@ const createGuidedTourController = ({ setPageFn, getCurrentPageFn }) => {
     }
     overlay.classList.remove("hidden");
     overlay.setAttribute("aria-hidden", "false");
+    popover.classList.remove("hidden");
     await activateStep(0);
   };
 
@@ -317,6 +355,7 @@ const createGuidedTourController = ({ setPageFn, getCurrentPageFn }) => {
     state.running = false;
     overlay.classList.add("hidden");
     overlay.setAttribute("aria-hidden", "true");
+    popover.classList.add("hidden");
     clearHighlight();
     if (markComplete) {
       state.completionState = "completed";
@@ -344,6 +383,22 @@ const createGuidedTourController = ({ setPageFn, getCurrentPageFn }) => {
   closeButton.addEventListener("click", () => {
     stop({ markComplete: false });
   });
+  window.addEventListener("resize", () => {
+    if (!state.running || !highlightedElement) {
+      return;
+    }
+    positionPopover(highlightedElement);
+  });
+  window.addEventListener(
+    "scroll",
+    () => {
+      if (!state.running || !highlightedElement) {
+        return;
+      }
+      positionPopover(highlightedElement);
+    },
+    true,
+  );
 
   return {
     start,
