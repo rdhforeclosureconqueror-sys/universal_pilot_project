@@ -21,6 +21,214 @@ const apiBaseInput = document.getElementById("api-base");
 const AUTH_TOKEN_KEY = "auth_token";
 const TOUR_COMPLETED_KEY = "guided_tour_completed_v1";
 const TOUR_DISMISSED_KEY = "guided_tour_dismissed_v1";
+const ONBOARDING_STATE_STORAGE_KEY = "onboarding_state_v1";
+const ONBOARDING_SESSION_PROMPTS_KEY = "onboarding_prompt_session_seen_v1";
+const ONBOARDING_SCHEMA_VERSION = 1;
+
+// Phase A1: onboarding/adoption config contract (schema + rules only, no UI/runtime wiring yet).
+const FEATURE_ADOPTION_STATES = Object.freeze({
+  NOT_SEEN: "not_seen",
+  SEEN: "seen",
+  INTERACTED: "interacted",
+  ADOPTED: "adopted",
+});
+
+const ONBOARDING_MILESTONES = Object.freeze({
+  ONBOARDING_STARTED: "onboarding_started",
+  ONBOARDING_COMPLETED: "onboarding_completed",
+  CASES_SEEN: "cases_seen",
+  FIRST_MEANINGFUL_CASE_ACTION: "first_meaningful_case_action",
+  MAP_SEEN: "map_seen",
+  ANALYTICS_SEEN: "analytics_seen",
+  GUIDED_TOUR_REPLAYED_MANUALLY: "guided_tour_replayed_manually",
+});
+
+const ONBOARDING_DEFAULT_STATE = Object.freeze({
+  version: ONBOARDING_SCHEMA_VERSION,
+  milestones: {
+    [ONBOARDING_MILESTONES.ONBOARDING_STARTED]: null,
+    [ONBOARDING_MILESTONES.ONBOARDING_COMPLETED]: null,
+    [ONBOARDING_MILESTONES.CASES_SEEN]: null,
+    [ONBOARDING_MILESTONES.FIRST_MEANINGFUL_CASE_ACTION]: null,
+    [ONBOARDING_MILESTONES.MAP_SEEN]: null,
+    [ONBOARDING_MILESTONES.ANALYTICS_SEEN]: null,
+    [ONBOARDING_MILESTONES.GUIDED_TOUR_REPLAYED_MANUALLY]: null,
+  },
+  features: {
+    cases: FEATURE_ADOPTION_STATES.NOT_SEEN,
+    map: FEATURE_ADOPTION_STATES.NOT_SEEN,
+    data: FEATURE_ADOPTION_STATES.NOT_SEEN,
+  },
+  promptHistory: {
+    byPromptId: {},
+    lastPromptAt: null,
+  },
+  meta: {
+    lastUpdatedAt: null,
+    resetCount: 0,
+  },
+});
+
+const ONBOARDING_SUPPRESSION_RULES = Object.freeze({
+  suppressWhileGuidedTourRunning: true,
+  suppressMiniTourOffersWhileGlobalTourRunning: true,
+  onePromptAtATime: true,
+  oncePerPromptPerSession: true,
+  maxShowsPerPromptLifetime: 3,
+  minSessionsBetweenSamePrompt: 2,
+});
+
+const ONBOARDING_MINI_TOUR_CONFIG = Object.freeze({
+  cases: {
+    id: "cases-mini-tour-v1",
+    feature: "cases",
+    route: "cases",
+    stepIds: ["cases-workspace"],
+    trigger: {
+      milestoneAnyOfMissing: [
+        ONBOARDING_MILESTONES.CASES_SEEN,
+        ONBOARDING_MILESTONES.FIRST_MEANINGFUL_CASE_ACTION,
+      ],
+      featureStateAtMost: FEATURE_ADOPTION_STATES.SEEN,
+    },
+    replayEligible: true,
+    suppression: {
+      blockIfGuidedTourRunning: true,
+      blockIfPromptAlreadyShownThisSession: true,
+      blockIfPromptCapped: true,
+    },
+  },
+  data: {
+    id: "data-mini-tour-v1",
+    feature: "data",
+    route: "data",
+    stepIds: ["analytics-panel"],
+    trigger: {
+      milestoneMissing: ONBOARDING_MILESTONES.ANALYTICS_SEEN,
+      featureStateAtMost: FEATURE_ADOPTION_STATES.SEEN,
+    },
+    replayEligible: true,
+    suppression: {
+      blockIfGuidedTourRunning: true,
+      blockIfPromptAlreadyShownThisSession: true,
+      blockIfPromptCapped: true,
+    },
+  },
+});
+
+const ONBOARDING_PROMPT_RULE_MATRIX = Object.freeze([
+  {
+    id: "suggest-analytics-after-cases-usage",
+    priority: 100,
+    promptType: "feature_nudge",
+    targetFeature: "data",
+    eligibility: {
+      minSessionCount: 3,
+      requiresFeatureState: { cases: FEATURE_ADOPTION_STATES.SEEN },
+      requiresMilestoneMissing: ONBOARDING_MILESTONES.ANALYTICS_SEEN,
+    },
+    suppressIf: {
+      guidedTourRunning: true,
+      promptShownThisSession: true,
+      promptCappedAcrossSessions: true,
+    },
+  },
+  {
+    id: "suggest-first-case-action",
+    priority: 90,
+    promptType: "action_nudge",
+    targetFeature: "cases",
+    eligibility: {
+      minSessionCount: 2,
+      requiresMilestonePresent: ONBOARDING_MILESTONES.CASES_SEEN,
+      requiresMilestoneMissing: ONBOARDING_MILESTONES.FIRST_MEANINGFUL_CASE_ACTION,
+    },
+    suppressIf: {
+      guidedTourRunning: true,
+      promptShownThisSession: true,
+      promptCappedAcrossSessions: true,
+    },
+  },
+  {
+    id: "suggest-map-after-dashboard-only-pattern",
+    priority: 80,
+    promptType: "feature_nudge",
+    targetFeature: "map",
+    eligibility: {
+      minSessionCount: 3,
+      requiresRoutePattern: "dashboard_only",
+      requiresMilestoneMissing: ONBOARDING_MILESTONES.MAP_SEEN,
+    },
+    suppressIf: {
+      guidedTourRunning: true,
+      promptShownThisSession: true,
+      promptCappedAcrossSessions: true,
+    },
+  },
+]);
+
+const cloneDefaultOnboardingState = () =>
+  JSON.parse(JSON.stringify(ONBOARDING_DEFAULT_STATE));
+
+const getSessionPromptIds = () => {
+  try {
+    const value = JSON.parse(
+      sessionStorage.getItem(ONBOARDING_SESSION_PROMPTS_KEY) || "[]",
+    );
+    return Array.isArray(value) ? value : [];
+  } catch (error) {
+    return [];
+  }
+};
+
+const getOnboardingState = () => {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(ONBOARDING_STATE_STORAGE_KEY) || "null");
+    if (!parsed || typeof parsed !== "object") {
+      return cloneDefaultOnboardingState();
+    }
+    if (parsed.version !== ONBOARDING_SCHEMA_VERSION) {
+      return cloneDefaultOnboardingState();
+    }
+    return {
+      ...cloneDefaultOnboardingState(),
+      ...parsed,
+      milestones: {
+        ...ONBOARDING_DEFAULT_STATE.milestones,
+        ...(parsed.milestones || {}),
+      },
+      features: {
+        ...ONBOARDING_DEFAULT_STATE.features,
+        ...(parsed.features || {}),
+      },
+      promptHistory: {
+        ...ONBOARDING_DEFAULT_STATE.promptHistory,
+        ...(parsed.promptHistory || {}),
+      },
+      meta: {
+        ...ONBOARDING_DEFAULT_STATE.meta,
+        ...(parsed.meta || {}),
+      },
+    };
+  } catch (error) {
+    return cloneDefaultOnboardingState();
+  }
+};
+
+const setOnboardingState = (nextState) => {
+  const current = getOnboardingState();
+  const normalized = {
+    ...current,
+    ...(nextState || {}),
+    version: ONBOARDING_SCHEMA_VERSION,
+    meta: {
+      ...current.meta,
+      ...((nextState && nextState.meta) || {}),
+      lastUpdatedAt: new Date().toISOString(),
+    },
+  };
+  localStorage.setItem(ONBOARDING_STATE_STORAGE_KEY, JSON.stringify(normalized));
+};
 
 const getAuthToken = () => localStorage.getItem(AUTH_TOKEN_KEY) || "";
 
