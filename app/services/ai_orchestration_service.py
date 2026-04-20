@@ -20,6 +20,7 @@ from app.models.essential_worker import EssentialWorkerProfile
 from app.models.veteran_intelligence import VeteranProfile
 
 from app.services.platform_knowledge_service import PlatformKnowledgeService
+from app.services.action_payload_builder import ActionExecutionContext, build_action_payload
 
 from app.services.veteran_intelligence_service import (
     get_advisory,
@@ -29,8 +30,6 @@ from app.services.veteran_intelligence_service import (
     upsert_veteran_profile,
 )
 
-import re
-from uuid import UUID
 from app.services.essential_worker_housing_service import (
     discover_housing_programs,
     generate_homebuyer_action_plan,
@@ -250,6 +249,19 @@ def _execute_mufasa_actions(prompt: str, user_id: UUID, db: Session) -> tuple[li
     results: dict = {}
     response_fragments: list[str] = []
 
+    latest_foreclosure = db.query(ForeclosureCaseData).order_by(ForeclosureCaseData.created_at.desc()).first()
+    latest_worker = db.query(EssentialWorkerProfile).order_by(EssentialWorkerProfile.created_at.desc()).first()
+
+    def action_context(*, case_id: UUID | None = None, profile_id: UUID | None = None, state: str | None = None) -> ActionExecutionContext:
+        resolved_case_id = case_id or (latest_foreclosure.case_id if latest_foreclosure else None)
+        resolved_profile_id = profile_id or (latest_worker.id if latest_worker else None)
+        return ActionExecutionContext(
+            actor_id=user_id,
+            case_id=resolved_case_id,
+            profile_id=resolved_profile_id,
+            state=state,
+        )
+
     def run_action(name: str, fn):
         try:
             result = fn()
@@ -290,7 +302,15 @@ def _execute_mufasa_actions(prompt: str, user_id: UUID, db: Session) -> tuple[li
     if "create case from lead" in normalized:
         top_lead = db.query(PropertyLead).order_by(PropertyLead.created_at.desc()).first()
         if top_lead:
-            run_action("create_case_from_lead", lambda: {"case_id": str(create_case_from_lead(db, lead_id=top_lead.id))})
+            payload = build_action_payload(
+                "create_case_from_lead",
+                {"lead_id": str(top_lead.id)},
+                context=action_context(),
+            )
+            run_action(
+                "create_case_from_lead",
+                lambda: {"case_id": str(create_case_from_lead(db, lead_id=UUID(str(payload["lead_id"])), actor_id=UUID(str(payload["actor_id"]))))},
+            )
             response_fragments.append("Created a case from the highest-priority lead.")
         else:
             results["create_case_from_lead"] = {"error": "No leads available to convert"}
@@ -306,7 +326,9 @@ def _execute_mufasa_actions(prompt: str, user_id: UUID, db: Session) -> tuple[li
                 lambda: create_foreclosure_profile(
                     db,
                     case_id=None,
-                    payload={
+                    payload=build_action_payload(
+                        "create_foreclosure_profile",
+                        {
                         "property_address": "123 Rescue Ave",
                         "city": "Dallas",
                         "state": "TX",
@@ -314,7 +336,9 @@ def _execute_mufasa_actions(prompt: str, user_id: UUID, db: Session) -> tuple[li
                         "loan_balance": 240000,
                         "arrears_amount": 12000,
                         "foreclosure_stage": "pre_foreclosure",
-                    },
+                        },
+                        context=action_context(state="TX"),
+                    ),
                     actor_id=user_id,
                 ),
             )
@@ -333,9 +357,23 @@ def _execute_mufasa_actions(prompt: str, user_id: UUID, db: Session) -> tuple[li
         response_fragments.append("Borrower/contact tracing completed.")
 
     if any(word in normalized for word in ["create worker profile", "essential worker"]):
+        worker_payload = build_action_payload(
+            "create_worker_profile",
+            {"profession": "nurse", "city": "Dallas", "state": "TX"},
+            context=action_context(state="TX"),
+        )
         profile = run_action(
             "create_worker_profile",
-            lambda: upsert_worker_profile(db, payload={"profession": "nurse", "state": "TX", "city": "Dallas", "first_time_homebuyer": "true"}, actor_id=user_id),
+            lambda: upsert_worker_profile(
+                db,
+                payload={
+                    "profession": worker_payload["profession"],
+                    "state": worker_payload["state"],
+                    "city": worker_payload["city"],
+                    "first_time_homebuyer": worker_payload["first_time_homebuyer"],
+                },
+                actor_id=UUID(str(worker_payload["actor_id"])),
+            ),
         )
         if profile:
             results["create_worker_profile"] = {"profile_id": str(profile.id)}
@@ -344,7 +382,12 @@ def _execute_mufasa_actions(prompt: str, user_id: UUID, db: Session) -> tuple[li
     if any(word in normalized for word in ["discover programs", "housing assistance", "discover housing"]):
         worker = db.query(EssentialWorkerProfile).order_by(EssentialWorkerProfile.created_at.desc()).first()
         if worker:
-            run_action("discover_housing_programs", lambda: discover_housing_programs(db, profile_id=worker.id))
+            payload = build_action_payload(
+                "discover_housing_programs",
+                {"profile_id": str(worker.id)},
+                context=action_context(profile_id=worker.id),
+            )
+            run_action("discover_housing_programs", lambda: discover_housing_programs(db, profile_id=UUID(str(payload["profile_id"]))))
             response_fragments.append("Discovered matching housing assistance programs.")
         else:
             results["discover_housing_programs"] = {"error": "Create worker profile first"}
@@ -352,7 +395,12 @@ def _execute_mufasa_actions(prompt: str, user_id: UUID, db: Session) -> tuple[li
     if any(word in normalized for word in ["action plan", "homebuyer action plan", "rescue action plan"]):
         worker = db.query(EssentialWorkerProfile).order_by(EssentialWorkerProfile.created_at.desc()).first()
         if worker:
-            run_action("generate_homebuyer_action_plan", lambda: generate_homebuyer_action_plan(db, profile_id=worker.id))
+            payload = build_action_payload(
+                "generate_homebuyer_action_plan",
+                {"profile_id": str(worker.id)},
+                context=action_context(profile_id=worker.id),
+            )
+            run_action("generate_homebuyer_action_plan", lambda: generate_homebuyer_action_plan(db, profile_id=UUID(str(payload["profile_id"]))))
             response_fragments.append("Generated homeowner action plan.")
         else:
             results["generate_homebuyer_action_plan"] = {"error": "Create worker profile first"}
@@ -422,7 +470,15 @@ def _execute_mufasa_actions(prompt: str, user_id: UUID, db: Session) -> tuple[li
         top_lead = db.query(PropertyLead).order_by(PropertyLead.created_at.desc()).first()
         if top_lead:
             run_action("score_lead", lambda: score_property_lead(db, lead_id=top_lead.id))
-            run_action("create_case_from_lead", lambda: {"case_id": str(create_case_from_lead(db, lead_id=top_lead.id))})
+            payload = build_action_payload(
+                "create_case_from_lead",
+                {"lead_id": str(top_lead.id)},
+                context=action_context(),
+            )
+            run_action(
+                "create_case_from_lead",
+                lambda: {"case_id": str(create_case_from_lead(db, lead_id=UUID(str(payload["lead_id"])), actor_id=UUID(str(payload["actor_id"]))))},
+            )
         run_action("skiptrace_property_owner", lambda: skiptrace_property_owner(address="123 Main St", provider="batchdata"))
         profile = run_action(
             "create_worker_profile",

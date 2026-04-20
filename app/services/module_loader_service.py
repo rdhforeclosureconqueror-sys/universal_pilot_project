@@ -11,6 +11,10 @@ from sqlalchemy.orm import Session
 from app.models.audit_logs import AuditLog
 from app.models.module_registry import ModuleRegistry
 from app.models.users import User
+from app.services.action_payload_builder import (
+    ActionExecutionContext,
+    build_action_payload,
+)
 from app.services.escalation_service import run_daily_risk_evaluation
 from app.services.foreclosure_intelligence_service import calculate_case_priority
 from app.services.property_analysis_service import calculate_acquisition_score, calculate_equity, calculate_ltv, calculate_rescue_score, classify_intervention
@@ -97,6 +101,7 @@ class DomainServiceBroker:
         module: ModuleRegistry,
         action_name: str,
         payload: dict[str, Any],
+        case_id: UUID | None = None,
         actor_id: UUID | None = None,
     ) -> dict[str, Any]:
 
@@ -122,9 +127,15 @@ class DomainServiceBroker:
                 detail=f"Action '{action_name}' requires service '{service_name}'",
             )
 
+        built_payload = build_action_payload(
+            action_name,
+            payload,
+            context=ActionExecutionContext(actor_id=actor_id, case_id=case_id),
+        )
+
         return handler(
             db,
-            payload,
+            built_payload,
             requires_actor and actor_id is not None,
             actor_id,
         )
@@ -374,19 +385,19 @@ class ModuleLoaderService:
                 case_id=request.case_id,
                 action=f"modules.{live_module.module_name}.{action_name}",
             )
+            try:
+                case_uuid = UUID(request.case_id)
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail="case_id must be a valid UUID") from exc
 
             result = self.domain_broker.execute_action(
                 db,
                 module=live_module,
                 action_name=action_name,
                 payload=request.payload,
+                case_id=case_uuid,
                 actor_id=user.id,
             )
-
-            try:
-                case_uuid = UUID(request.case_id)
-            except ValueError as exc:
-                raise HTTPException(status_code=400, detail="case_id must be a valid UUID") from exc
 
             db.add(
                 AuditLog(
