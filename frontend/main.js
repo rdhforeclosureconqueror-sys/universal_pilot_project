@@ -64,6 +64,24 @@ const ONBOARDING_DEFAULT_STATE = Object.freeze({
     byPromptId: {},
     lastPromptAt: null,
   },
+  miniTours: {
+    cases: {
+      status: "not_started",
+      startedAt: null,
+      completedAt: null,
+      dismissedAt: null,
+      lastShownAt: null,
+      replayCount: 0,
+    },
+    data: {
+      status: "not_started",
+      startedAt: null,
+      completedAt: null,
+      dismissedAt: null,
+      lastShownAt: null,
+      replayCount: 0,
+    },
+  },
   meta: {
     lastUpdatedAt: null,
     resetCount: 0,
@@ -187,6 +205,20 @@ const getSessionPromptIds = () => {
   }
 };
 
+const markSessionPromptSeen = (promptId) => {
+  if (!promptId) {
+    return;
+  }
+  const existing = getSessionPromptIds();
+  if (existing.includes(promptId)) {
+    return;
+  }
+  sessionStorage.setItem(
+    ONBOARDING_SESSION_PROMPTS_KEY,
+    JSON.stringify([...existing, promptId]),
+  );
+};
+
 const getOnboardingState = () => {
   try {
     const parsed = JSON.parse(localStorage.getItem(ONBOARDING_STATE_STORAGE_KEY) || "null");
@@ -210,6 +242,10 @@ const getOnboardingState = () => {
       promptHistory: {
         ...ONBOARDING_DEFAULT_STATE.promptHistory,
         ...(parsed.promptHistory || {}),
+      },
+      miniTours: {
+        ...ONBOARDING_DEFAULT_STATE.miniTours,
+        ...(parsed.miniTours || {}),
       },
       meta: {
         ...ONBOARDING_DEFAULT_STATE.meta,
@@ -315,6 +351,66 @@ const promoteToAdoptedAfterRepeatedSessions = (featureKey) => {
   if (sessions.length >= 2) {
     progressFeatureState(featureKey, FEATURE_ADOPTION_STATES.ADOPTED);
   }
+};
+
+const getMiniTourStateByKey = (tourKey) => {
+  const onboardingState = getOnboardingState();
+  return onboardingState?.miniTours?.[tourKey] || null;
+};
+
+const updateMiniTourState = (tourKey, updater) =>
+  updateOnboardingState((current) => {
+    if (!tourKey || typeof updater !== "function") {
+      return null;
+    }
+    const currentTourState = current?.miniTours?.[tourKey] || {};
+    const patch = updater(currentTourState, current);
+    if (!patch) {
+      return null;
+    }
+    return {
+      miniTours: {
+        ...(current.miniTours || {}),
+        [tourKey]: {
+          ...currentTourState,
+          ...patch,
+        },
+      },
+    };
+  });
+
+const markMiniTourStarted = (tourKey) => {
+  const now = new Date().toISOString();
+  updateMiniTourState(tourKey, (currentTourState) => ({
+    status: "started",
+    startedAt: currentTourState?.startedAt || now,
+    lastShownAt: now,
+    replayCount: Number(currentTourState?.replayCount || 0) + 1,
+  }));
+};
+
+const markMiniTourCompleted = (tourKey) => {
+  const now = new Date().toISOString();
+  updateMiniTourState(tourKey, () => ({
+    status: "completed",
+    completedAt: now,
+    dismissedAt: null,
+    lastShownAt: now,
+  }));
+};
+
+const markMiniTourDismissed = (tourKey) => {
+  const now = new Date().toISOString();
+  updateMiniTourState(tourKey, (currentTourState) => {
+    if (currentTourState?.status === "completed") {
+      return null;
+    }
+    return {
+      status: "dismissed",
+      dismissedAt: now,
+      lastShownAt: now,
+    };
+  });
 };
 
 const trackCasesInteraction = () => {
@@ -489,12 +585,157 @@ const TOUR_STEPS = [
   },
 ];
 
+const TOUR_STEPS_BY_ID = TOUR_STEPS.reduce((acc, step) => {
+  acc[step.id] = step;
+  return acc;
+}, {});
+
+const TOUR_REGISTRY = Object.freeze({
+  "global-tour-v1": {
+    id: "global-tour-v1",
+    type: "global",
+    completionStorage: {
+      completedKey: TOUR_COMPLETED_KEY,
+      dismissedKey: TOUR_DISMISSED_KEY,
+    },
+    steps: TOUR_STEPS,
+  },
+  "cases-mini-tour-v1": {
+    id: "cases-mini-tour-v1",
+    type: "mini",
+    miniTourKey: "cases",
+    route: "cases",
+    steps: [
+      {
+        id: "cases-mini-overview",
+        target: '[data-tour="cases-workspace"]',
+        title: "Cases Workspace",
+        body: "This page is your case operations workspace where active files are reviewed and moved through lifecycle states.",
+        page: "cases",
+        optional: false,
+        skipIfMissing: true,
+      },
+      {
+        id: "cases-mini-interaction",
+        target: '[data-tour="cases-filter-panel"]',
+        title: "Start with Filters",
+        body: "Use the Case Filters panel first to narrow the queue by status or date range before reviewing individual records.",
+        page: "cases",
+        optional: false,
+        skipIfMissing: true,
+      },
+      {
+        id: "cases-mini-first-action",
+        target: '[data-tour="cases-detail-panel"]',
+        title: "First Meaningful Action",
+        body: "Load a case in Case Detail, then complete a consent or referral action to move the case forward.",
+        page: "cases",
+        optional: false,
+        skipIfMissing: true,
+      },
+    ],
+  },
+  "data-mini-tour-v1": {
+    id: "data-mini-tour-v1",
+    type: "mini",
+    miniTourKey: "data",
+    route: "data",
+    steps: [
+      {
+        id: "data-mini-overview",
+        target: '[data-tour="analytics-panel"]',
+        title: "Analytics Workspace",
+        body: "This area shows live pipeline data so you can spot trends and prioritize operational follow-up.",
+        page: "data",
+        optional: false,
+        skipIfMissing: true,
+      },
+      {
+        id: "data-mini-main-table",
+        target: '[data-tour="data-leads-panel"]',
+        title: "Main Table to Read First",
+        body: "Start with Leads to scan status and score signals, then compare with bot reports for context.",
+        page: "data",
+        optional: false,
+        skipIfMissing: true,
+      },
+      {
+        id: "data-mini-next-step",
+        target: TOUR_STEPS_BY_ID.navigation.target,
+        title: "Useful Next Step",
+        body: "After identifying high-priority leads, jump to Case Management from the sidebar to act on them.",
+        page: "data",
+        optional: false,
+        skipIfMissing: true,
+      },
+    ],
+  },
+});
+
+const getTourConfig = (tourId) => TOUR_REGISTRY[tourId] || null;
+
+const isMiniTourEligible = (tourKey) => {
+  const tourConfig = ONBOARDING_MINI_TOUR_CONFIG[tourKey];
+  if (!tourConfig) {
+    return false;
+  }
+
+  if (ONBOARDING_SUPPRESSION_RULES.suppressMiniTourOffersWhileGlobalTourRunning && guidedTourController?.isRunning()) {
+    return false;
+  }
+
+  const currentPage = getCurrentPageFromHash();
+  if (currentPage !== tourConfig.route) {
+    return false;
+  }
+
+  const onboardingState = getOnboardingState();
+  const miniTourState = onboardingState?.miniTours?.[tourKey];
+  if (miniTourState?.status === "completed" || miniTourState?.status === "dismissed") {
+    return false;
+  }
+
+  if (
+    tourConfig.suppression?.blockIfPromptAlreadyShownThisSession &&
+    getSessionPromptIds().includes(tourConfig.id)
+  ) {
+    return false;
+  }
+
+  const featureState = onboardingState?.features?.[tourConfig.feature] || FEATURE_ADOPTION_STATES.NOT_SEEN;
+  const featureRank = FEATURE_ADOPTION_RANK[featureState] ?? 0;
+  const maxRank = FEATURE_ADOPTION_RANK[tourConfig.trigger?.featureStateAtMost] ?? Number.POSITIVE_INFINITY;
+  if (featureRank > maxRank) {
+    return false;
+  }
+
+  if (tourConfig.trigger?.milestoneMissing) {
+    const milestoneTimestamp = onboardingState?.milestones?.[tourConfig.trigger.milestoneMissing];
+    if (milestoneTimestamp) {
+      return false;
+    }
+  }
+
+  if (Array.isArray(tourConfig.trigger?.milestoneAnyOfMissing)) {
+    const hasAnyMissing = tourConfig.trigger.milestoneAnyOfMissing.some(
+      (milestoneKey) => !onboardingState?.milestones?.[milestoneKey],
+    );
+    if (!hasAnyMissing) {
+      return false;
+    }
+  }
+
+  return true;
+};
+
 const createGuidedTourController = ({ setPageFn, getCurrentPageFn }) => {
   const state = {
     running: false,
-    steps: TOUR_STEPS,
+    steps: [],
     currentStepIndex: -1,
     completionState: "idle",
+    activeTourId: null,
+    activeTourType: null,
   };
 
   const markCompleted = () => {
@@ -672,8 +913,24 @@ const createGuidedTourController = ({ setPageFn, getCurrentPageFn }) => {
     positionPopover(target);
   };
 
-  const start = async ({ restart = false } = {}) => {
-    markOnboardingMilestone(ONBOARDING_MILESTONES.ONBOARDING_STARTED);
+  const start = async ({ tourId = "global-tour-v1", restart = false } = {}) => {
+    const tourConfig = getTourConfig(tourId);
+    if (!tourConfig || state.running) {
+      return false;
+    }
+    state.steps = tourConfig.steps || [];
+    state.activeTourId = tourConfig.id;
+    state.activeTourType = tourConfig.type;
+    if (!state.steps.length) {
+      return false;
+    }
+    if (tourConfig.type === "global") {
+      markOnboardingMilestone(ONBOARDING_MILESTONES.ONBOARDING_STARTED);
+    }
+    if (tourConfig.type === "mini" && tourConfig.miniTourKey) {
+      markMiniTourStarted(tourConfig.miniTourKey);
+      markSessionPromptSeen(tourConfig.id);
+    }
     state.running = true;
     if (restart) {
       state.completionState = "restarted";
@@ -684,6 +941,7 @@ const createGuidedTourController = ({ setPageFn, getCurrentPageFn }) => {
     overlay.setAttribute("aria-hidden", "false");
     popover.classList.remove("hidden");
     await activateStep(0);
+    return true;
   };
 
   const next = async () => {
@@ -696,6 +954,8 @@ const createGuidedTourController = ({ setPageFn, getCurrentPageFn }) => {
 
   const stop = ({ markComplete = false } = {}) => {
     const wasRunning = state.running;
+    const activeTourId = state.activeTourId;
+    const activeTourConfig = getTourConfig(activeTourId);
     state.running = false;
     overlay.classList.add("hidden");
     overlay.setAttribute("aria-hidden", "true");
@@ -703,20 +963,36 @@ const createGuidedTourController = ({ setPageFn, getCurrentPageFn }) => {
     clearHighlight();
     if (markComplete) {
       state.completionState = "completed";
-      markCompleted();
-      markOnboardingMilestone(ONBOARDING_MILESTONES.ONBOARDING_COMPLETED);
+      if (activeTourConfig?.type === "global") {
+        markCompleted();
+        markOnboardingMilestone(ONBOARDING_MILESTONES.ONBOARDING_COMPLETED);
+      }
+      if (activeTourConfig?.type === "mini" && activeTourConfig?.miniTourKey) {
+        markMiniTourCompleted(activeTourConfig.miniTourKey);
+      }
+      state.activeTourId = null;
+      state.activeTourType = null;
+      state.steps = [];
       return;
     }
     if (!wasRunning || state.completionState === "completed") {
       return;
     }
     state.completionState = "dismissed";
-    markDismissed();
+    if (activeTourConfig?.type === "global") {
+      markDismissed();
+    }
+    if (activeTourConfig?.type === "mini" && activeTourConfig?.miniTourKey) {
+      markMiniTourDismissed(activeTourConfig.miniTourKey);
+    }
+    state.activeTourId = null;
+    state.activeTourType = null;
+    state.steps = [];
   };
 
-  const restart = async () => {
+  const restart = async ({ tourId = "global-tour-v1" } = {}) => {
     stop({ markComplete: false });
-    await start({ restart: true });
+    await start({ tourId, restart: true });
   };
 
   nextButton.addEventListener("click", () => {
@@ -754,11 +1030,29 @@ const createGuidedTourController = ({ setPageFn, getCurrentPageFn }) => {
     complete: () => stop({ markComplete: true }),
     resolveTarget,
     getState: () => ({ ...state }),
+    isRunning: () => state.running,
+    launchTourById: async (tourId, { force = false } = {}) => {
+      const tourConfig = getTourConfig(tourId);
+      if (!tourConfig || state.running) {
+        return false;
+      }
+      if (!force && tourConfig.type === "mini" && tourConfig.miniTourKey) {
+        if (!isMiniTourEligible(tourConfig.miniTourKey)) {
+          return false;
+        }
+      }
+      await start({ tourId });
+      return true;
+    },
     canAutoStart: () => {
       const completed = localStorage.getItem(TOUR_COMPLETED_KEY) === "true";
       const dismissed = localStorage.getItem(TOUR_DISMISSED_KEY) === "true";
       return !completed && !dismissed;
     },
+    getEligibleMiniToursForPage: () =>
+      Object.keys(ONBOARDING_MINI_TOUR_CONFIG).filter((tourKey) =>
+        isMiniTourEligible(tourKey),
+      ),
   };
 };
 
@@ -1994,7 +2288,7 @@ const wireEvents = () => {
     if (!guidedTourController) {
       return;
     }
-    guidedTourController.restart();
+    guidedTourController.restart({ tourId: "global-tour-v1" });
   });
 
   document.getElementById("api-base").addEventListener("change", () => {
@@ -2095,6 +2389,12 @@ const initapp = async () => {
       getCurrentPageFn: getCurrentPageFromHash,
     });
   }
+  window.crmTourApi = {
+    launchTourById: (tourId, options) => guidedTourController?.launchTourById(tourId, options),
+    getEligibleMiniToursForCurrentPage: () =>
+      guidedTourController?.getEligibleMiniToursForPage() || [],
+    getMiniTourStateByKey,
+  };
 
   if (!apiBaseInput.value && window.__API_BASE_URL__) {
     apiBaseInput.value = window.__API_BASE_URL__;
