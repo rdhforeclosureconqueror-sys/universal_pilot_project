@@ -45,6 +45,7 @@ const ONBOARDING_MILESTONES = Object.freeze({
 
 const ONBOARDING_DEFAULT_STATE = Object.freeze({
   version: ONBOARDING_SCHEMA_VERSION,
+  sessionCount: 0,
   milestones: {
     [ONBOARDING_MILESTONES.ONBOARDING_STARTED]: null,
     [ONBOARDING_MILESTONES.ONBOARDING_COMPLETED]: null,
@@ -66,6 +67,11 @@ const ONBOARDING_DEFAULT_STATE = Object.freeze({
   meta: {
     lastUpdatedAt: null,
     resetCount: 0,
+    featureInteractionSessions: {
+      cases: [],
+      map: [],
+      data: [],
+    },
   },
 });
 
@@ -228,6 +234,135 @@ const setOnboardingState = (nextState) => {
     },
   };
   localStorage.setItem(ONBOARDING_STATE_STORAGE_KEY, JSON.stringify(normalized));
+};
+
+const FEATURE_ADOPTION_RANK = Object.freeze({
+  [FEATURE_ADOPTION_STATES.NOT_SEEN]: 0,
+  [FEATURE_ADOPTION_STATES.SEEN]: 1,
+  [FEATURE_ADOPTION_STATES.INTERACTED]: 2,
+  [FEATURE_ADOPTION_STATES.ADOPTED]: 3,
+});
+
+const onboardingRuntime = {
+  appLoadSessionId: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+  sessionCountIncrementedThisLoad: false,
+};
+
+const updateOnboardingState = (updater) => {
+  const current = getOnboardingState();
+  const next = updater(current);
+  if (!next) {
+    return current;
+  }
+  setOnboardingState(next);
+  return getOnboardingState();
+};
+
+const markOnboardingMilestone = (milestoneKey) => {
+  updateOnboardingState((current) => {
+    if (!current.milestones || current.milestones[milestoneKey]) {
+      return null;
+    }
+    return {
+      milestones: {
+        ...current.milestones,
+        [milestoneKey]: new Date().toISOString(),
+      },
+    };
+  });
+};
+
+const progressFeatureState = (featureKey, targetState) => {
+  updateOnboardingState((current) => {
+    const existingState = current.features?.[featureKey] || FEATURE_ADOPTION_STATES.NOT_SEEN;
+    const existingRank = FEATURE_ADOPTION_RANK[existingState] ?? 0;
+    const targetRank = FEATURE_ADOPTION_RANK[targetState] ?? 0;
+    if (targetRank <= existingRank) {
+      return null;
+    }
+    return {
+      features: {
+        ...current.features,
+        [featureKey]: targetState,
+      },
+    };
+  });
+};
+
+const recordFeatureInteractionSession = (featureKey) =>
+  updateOnboardingState((current) => {
+    const currentSessionMap = current.meta?.featureInteractionSessions || {};
+    const existingSessions = Array.isArray(currentSessionMap[featureKey])
+      ? currentSessionMap[featureKey]
+      : [];
+    if (existingSessions.includes(onboardingRuntime.appLoadSessionId)) {
+      return null;
+    }
+    const nextSessions = [...existingSessions, onboardingRuntime.appLoadSessionId].slice(-20);
+    return {
+      meta: {
+        featureInteractionSessions: {
+          ...currentSessionMap,
+          [featureKey]: nextSessions,
+        },
+      },
+    };
+  });
+
+const promoteToAdoptedAfterRepeatedSessions = (featureKey) => {
+  const nextState = recordFeatureInteractionSession(featureKey);
+  const sessions = nextState?.meta?.featureInteractionSessions?.[featureKey] || [];
+  if (sessions.length >= 2) {
+    progressFeatureState(featureKey, FEATURE_ADOPTION_STATES.ADOPTED);
+  }
+};
+
+const trackCasesInteraction = () => {
+  progressFeatureState("cases", FEATURE_ADOPTION_STATES.INTERACTED);
+};
+
+const trackCasesAdoptionAction = () => {
+  trackCasesInteraction();
+  progressFeatureState("cases", FEATURE_ADOPTION_STATES.ADOPTED);
+  markOnboardingMilestone(ONBOARDING_MILESTONES.FIRST_MEANINGFUL_CASE_ACTION);
+};
+
+const trackMapInteraction = () => {
+  progressFeatureState("map", FEATURE_ADOPTION_STATES.INTERACTED);
+  promoteToAdoptedAfterRepeatedSessions("map");
+};
+
+const trackDataInteraction = () => {
+  progressFeatureState("data", FEATURE_ADOPTION_STATES.INTERACTED);
+  promoteToAdoptedAfterRepeatedSessions("data");
+};
+
+const trackOnboardingForRoute = (pageKey) => {
+  if (pageKey === "cases") {
+    markOnboardingMilestone(ONBOARDING_MILESTONES.CASES_SEEN);
+    progressFeatureState("cases", FEATURE_ADOPTION_STATES.SEEN);
+  }
+  if (pageKey === "map") {
+    markOnboardingMilestone(ONBOARDING_MILESTONES.MAP_SEEN);
+    progressFeatureState("map", FEATURE_ADOPTION_STATES.SEEN);
+  }
+  if (pageKey === "data") {
+    markOnboardingMilestone(ONBOARDING_MILESTONES.ANALYTICS_SEEN);
+    progressFeatureState("data", FEATURE_ADOPTION_STATES.SEEN);
+  }
+};
+
+const maybeIncrementOnboardingSessionCount = (pageKey) => {
+  if (onboardingRuntime.sessionCountIncrementedThisLoad) {
+    return;
+  }
+  if (!getAuthToken() || !isNonLoginDashboardRoute(pageKey)) {
+    return;
+  }
+  updateOnboardingState((current) => ({
+    sessionCount: Number(current.sessionCount || 0) + 1,
+  }));
+  onboardingRuntime.sessionCountIncrementedThisLoad = true;
 };
 
 const getAuthToken = () => localStorage.getItem(AUTH_TOKEN_KEY) || "";
@@ -538,6 +673,7 @@ const createGuidedTourController = ({ setPageFn, getCurrentPageFn }) => {
   };
 
   const start = async ({ restart = false } = {}) => {
+    markOnboardingMilestone(ONBOARDING_MILESTONES.ONBOARDING_STARTED);
     state.running = true;
     if (restart) {
       state.completionState = "restarted";
@@ -568,6 +704,7 @@ const createGuidedTourController = ({ setPageFn, getCurrentPageFn }) => {
     if (markComplete) {
       state.completionState = "completed";
       markCompleted();
+      markOnboardingMilestone(ONBOARDING_MILESTONES.ONBOARDING_COMPLETED);
       return;
     }
     if (!wasRunning || state.completionState === "completed") {
@@ -1029,6 +1166,7 @@ const setPage = (pageId) => {
   document.getElementById("page-title").textContent = pages[pageKey].title;
   document.getElementById("page-subtitle").textContent =
     pages[pageKey].subtitle;
+  trackOnboardingForRoute(pageKey);
 };
 
 const validateUuid = (value) => uuidPattern.test(value.trim());
@@ -1410,6 +1548,8 @@ const renderMapPins = (map, properties) => {
         .bindPopup(popup);
     }
   });
+  markOnboardingMilestone(ONBOARDING_MILESTONES.MAP_SEEN);
+  progressFeatureState("map", FEATURE_ADOPTION_STATES.SEEN);
 };
 
 const loadProperties = async (mapInstance) => {
@@ -1467,6 +1607,7 @@ const loadBotOpsTables = async () => {
     renderLeadsTable(dashboard.leads || []);
     renderReportsTable(dashboard.reports || []);
     renderCommandsTable(dashboard.commands || []);
+    progressFeatureState("data", FEATURE_ADOPTION_STATES.SEEN);
   } catch (error) {
     document.getElementById("leads-empty").textContent =
       "Unable to load BotOps dashboard data.";
@@ -1479,6 +1620,7 @@ const loadBotOpsTables = async () => {
   try {
     const settings = await fetchJson(`${getApiBase()}/botops/settings`);
     renderSettingsTable(settings || []);
+    progressFeatureState("data", FEATURE_ADOPTION_STATES.SEEN);
   } catch (error) {
     document.getElementById("settings-empty").textContent =
       "Unable to load BotOps settings.";
@@ -1755,6 +1897,20 @@ const updateValidation = () => {
 
 
 const wireEvents = () => {
+  const caseFilterForm = document.getElementById("case-filter-form");
+  if (caseFilterForm) {
+    caseFilterForm.addEventListener("submit", () => {
+      trackCasesInteraction();
+    });
+  }
+
+  const caseDetailForm = document.getElementById("case-detail-form");
+  if (caseDetailForm) {
+    caseDetailForm.addEventListener("submit", () => {
+      trackCasesInteraction();
+    });
+  }
+
   document
     .getElementById("document-upload-form")
     .addEventListener("submit", handleDocumentUpload);
@@ -1766,7 +1922,10 @@ const wireEvents = () => {
     .addEventListener("submit", handleDocumentList);
   document
     .getElementById("referral-queue-form")
-    .addEventListener("submit", handleReferralQueue);
+    .addEventListener("submit", async (event) => {
+      trackCasesAdoptionAction();
+      await handleReferralQueue(event);
+    });
   document
     .getElementById("training-quiz-form")
     .addEventListener("submit", handleTrainingQuiz);
@@ -1775,10 +1934,16 @@ const wireEvents = () => {
     .addEventListener("submit", handleAiDryRun);
   document
     .getElementById("case-consent-grant-form")
-    .addEventListener("submit", handleCaseConsentGrant);
+    .addEventListener("submit", async (event) => {
+      trackCasesAdoptionAction();
+      await handleCaseConsentGrant(event);
+    });
   document
     .getElementById("case-consent-revoke-form")
-    .addEventListener("submit", handleCaseConsentRevoke);
+    .addEventListener("submit", async (event) => {
+      trackCasesAdoptionAction();
+      await handleCaseConsentRevoke(event);
+    });
 
   document.getElementById("property-import-form").addEventListener("submit", (event) => {
     event.preventDefault();
@@ -1825,6 +1990,7 @@ const wireEvents = () => {
     });
 
   document.getElementById("tour-replay").addEventListener("click", () => {
+    markOnboardingMilestone(ONBOARDING_MILESTONES.GUIDED_TOUR_REPLAYED_MANUALLY);
     if (!guidedTourController) {
       return;
     }
@@ -1842,6 +2008,25 @@ const wireEvents = () => {
 
   document.getElementById("map-refresh").addEventListener("click", () => {
     updateMapStatus();
+    trackMapInteraction();
+  });
+
+  if (state.mapInstance) {
+    ["dragend", "zoomend", "moveend"].forEach((eventName) => {
+      state.mapInstance.on(eventName, () => {
+        trackMapInteraction();
+      });
+    });
+  }
+
+  ["leads-table", "reports-table", "commands-table", "settings-table"].forEach((tableId) => {
+    const table = document.getElementById(tableId);
+    if (!table) {
+      return;
+    }
+    table.addEventListener("click", () => {
+      trackDataInteraction();
+    });
   });
 
   document
@@ -2009,6 +2194,7 @@ const initapp = async () => {
 
   const currentPage = window.location.hash.replace("#/", "");
   setPage(currentPage || "dashboard");
+  maybeIncrementOnboardingSessionCount(currentPage || "dashboard");
   await maybeAutoStartGuidedTour();
 };
 
