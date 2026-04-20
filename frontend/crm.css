@@ -392,3 +392,53 @@ button:disabled {
     transform: translateY(0);
   }
 }
+
+.tour-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(2, 6, 23, 0.6);
+  z-index: 1100;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 20px;
+}
+
+.tour-popover {
+  width: min(560px, calc(100vw - 40px));
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px 16px;
+  box-shadow: 0 20px 45px rgba(2, 6, 23, 0.35);
+}
+
+.tour-step-count {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+.tour-title {
+  margin: 0;
+}
+
+.tour-body {
+  margin: 8px 0 0;
+  color: var(--muted);
+}
+
+.tour-controls {
+  margin-top: 12px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.tour-target-active {
+  position: relative;
+  z-index: 1101;
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: 10px;
+}

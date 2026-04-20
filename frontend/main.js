@@ -78,6 +78,270 @@ const pages = {
   },
 };
 
+const TOUR_STEPS = [
+  {
+    id: "navigation",
+    target: '[data-tour="main-navigation"]',
+    title: "Main Navigation",
+    body: "Use this sidebar to move between your CRM workspaces, including cases, properties, maps, and compliance logs.",
+    page: "dashboard",
+    optional: false,
+    skipIfMissing: true,
+  },
+  {
+    id: "dashboard-overview",
+    target: '[data-tour="dashboard-overview"]',
+    title: "Dashboard Overview",
+    body: "This dashboard gives you a quick operational snapshot so you can spot priorities before diving into case work.",
+    page: "dashboard",
+    optional: false,
+    skipIfMissing: true,
+  },
+  {
+    id: "cases-workspace",
+    target: '[data-tour="cases-workspace"]',
+    title: "Case Workspace",
+    body: "Case Management is where records are filtered, reviewed, and updated as each homeowner or property moves through the lifecycle.",
+    page: "cases",
+    optional: false,
+    skipIfMissing: true,
+  },
+  {
+    id: "map-panel",
+    target: '[data-tour="map-panel"]',
+    title: "Map Panel",
+    body: "The map helps you understand geographic coverage, cluster opportunities, and location-based priorities.",
+    page: "map",
+    optional: true,
+    skipIfMissing: true,
+  },
+  {
+    id: "analytics-panel",
+    target: '[data-tour="analytics-panel"]',
+    title: "Analytics Tables",
+    body: "This area surfaces data tables and trend context to help guide performance and operational decisions.",
+    page: "data",
+    optional: true,
+    skipIfMissing: true,
+  },
+  {
+    id: "admin-command-center",
+    target: '[data-tour="admin-command-center"]',
+    title: "Admin Command Center",
+    body: "Admin actions and automation tools are centralized here for privileged users managing system operations.",
+    page: "admin-command-center",
+    optional: true,
+    skipIfMissing: true,
+  },
+  {
+    id: "tour-replay",
+    target: '[data-tour="tour-replay-button"]',
+    title: "Replay the Tour",
+    body: "Use this button any time you want a quick refresher of the platform layout.",
+    page: "dashboard",
+    optional: false,
+    skipIfMissing: true,
+  },
+];
+
+const createGuidedTourController = ({ setPageFn, getCurrentPageFn }) => {
+  const state = {
+    running: false,
+    steps: TOUR_STEPS,
+    currentStepIndex: -1,
+    completionState: "idle",
+  };
+
+  const overlay = document.createElement("div");
+  overlay.className = "tour-overlay hidden";
+  overlay.setAttribute("aria-hidden", "true");
+  overlay.innerHTML = `
+    <div class="tour-popover" role="dialog" aria-modal="true" aria-live="polite">
+      <div class="tour-step-count"></div>
+      <h3 class="tour-title"></h3>
+      <p class="tour-body"></p>
+      <div class="tour-controls">
+        <button type="button" class="ghost tour-prev">Back</button>
+        <button type="button" class="ghost tour-close">Close</button>
+        <button type="button" class="primary tour-next">Next</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  const stepCount = overlay.querySelector(".tour-step-count");
+  const title = overlay.querySelector(".tour-title");
+  const body = overlay.querySelector(".tour-body");
+  const prevButton = overlay.querySelector(".tour-prev");
+  const nextButton = overlay.querySelector(".tour-next");
+  const closeButton = overlay.querySelector(".tour-close");
+
+  let highlightedElement = null;
+
+  const clearHighlight = () => {
+    if (!highlightedElement) {
+      return;
+    }
+    highlightedElement.classList.remove("tour-target-active");
+    highlightedElement = null;
+  };
+
+  const isElementVisible = (element) => {
+    if (!element) {
+      return false;
+    }
+    const pageContainer = element.closest(".page");
+    if (pageContainer && !pageContainer.classList.contains("active")) {
+      return false;
+    }
+    const style = window.getComputedStyle(element);
+    if (style.display === "none" || style.visibility === "hidden") {
+      return false;
+    }
+    return true;
+  };
+
+  const resolveTarget = (step) => {
+    if (!step?.target) {
+      return null;
+    }
+    const element = document.querySelector(step.target);
+    if (!element || !isElementVisible(element)) {
+      return null;
+    }
+    return element;
+  };
+
+  const waitForStepTarget = async (step, attempts = 12) => {
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
+      const element = resolveTarget(step);
+      if (element) {
+        return element;
+      }
+      await new Promise((resolve) => window.setTimeout(resolve, 60));
+    }
+    return null;
+  };
+
+  const setRouteForStep = (step) => {
+    if (!step?.page) {
+      return;
+    }
+    const currentPage = getCurrentPageFn();
+    if (currentPage === step.page) {
+      return;
+    }
+    window.location.hash = `#/${step.page}`;
+    setPageFn(step.page);
+  };
+
+  const updatePopoverForStep = (step, stepIndex) => {
+    stepCount.textContent = `Step ${stepIndex + 1} of ${state.steps.length}`;
+    title.textContent = step.title;
+    body.textContent = step.body;
+    prevButton.disabled = stepIndex <= 0;
+    nextButton.textContent = stepIndex >= state.steps.length - 1 ? "Finish" : "Next";
+  };
+
+  const activateStep = async (requestedIndex) => {
+    if (!state.running) {
+      return;
+    }
+    if (requestedIndex < 0) {
+      requestedIndex = 0;
+    }
+    if (requestedIndex >= state.steps.length) {
+      state.completionState = "completed";
+      stop({ markComplete: true });
+      return;
+    }
+
+    const step = state.steps[requestedIndex];
+    setRouteForStep(step);
+    const target = await waitForStepTarget(step);
+
+    if (!target) {
+      if (step.skipIfMissing || step.optional) {
+        activateStep(requestedIndex + 1);
+        return;
+      }
+      stop({ markComplete: false });
+      return;
+    }
+
+    clearHighlight();
+    highlightedElement = target;
+    target.classList.add("tour-target-active");
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+
+    state.currentStepIndex = requestedIndex;
+    updatePopoverForStep(step, requestedIndex);
+  };
+
+  const start = async ({ restart = false } = {}) => {
+    state.running = true;
+    if (restart) {
+      state.completionState = "restarted";
+    } else {
+      state.completionState = "in_progress";
+    }
+    overlay.classList.remove("hidden");
+    overlay.setAttribute("aria-hidden", "false");
+    await activateStep(0);
+  };
+
+  const next = async () => {
+    await activateStep(state.currentStepIndex + 1);
+  };
+
+  const previous = async () => {
+    await activateStep(state.currentStepIndex - 1);
+  };
+
+  const stop = ({ markComplete = false } = {}) => {
+    state.running = false;
+    overlay.classList.add("hidden");
+    overlay.setAttribute("aria-hidden", "true");
+    clearHighlight();
+    if (markComplete) {
+      state.completionState = "completed";
+    } else if (state.completionState !== "completed") {
+      state.completionState = "dismissed";
+    }
+  };
+
+  const restart = async () => {
+    stop({ markComplete: false });
+    await start({ restart: true });
+  };
+
+  nextButton.addEventListener("click", () => {
+    next();
+  });
+  prevButton.addEventListener("click", () => {
+    previous();
+  });
+  closeButton.addEventListener("click", () => {
+    stop({ markComplete: false });
+  });
+  overlay.addEventListener("click", (event) => {
+    if (event.target === overlay) {
+      stop({ markComplete: false });
+    }
+  });
+
+  return {
+    start,
+    restart,
+    next,
+    previous,
+    stop,
+    complete: () => stop({ markComplete: true }),
+    resolveTarget,
+    getState: () => ({ ...state }),
+  };
+};
+
 const getApiBase = () => {
   const override = apiBaseInput.value.trim();
   if (override) {
@@ -86,6 +350,10 @@ const getApiBase = () => {
   const configured = window.__API_BASE_URL__ || "";
   return configured.endsWith("/") ? configured.slice(0, -1) : configured;
 };
+
+const getCurrentPageFromHash = () => window.location.hash.replace("#/", "") || "dashboard";
+
+let guidedTourController = null;
 
 const fetchOpenApi = async () => {
   const response = await fetch(`${getApiBase()}/openapi.json`);
@@ -1233,6 +1501,13 @@ const wireEvents = () => {
       document.body.classList.toggle("theme-dark");
     });
 
+  document.getElementById("tour-replay").addEventListener("click", () => {
+    if (!guidedTourController) {
+      return;
+    }
+    guidedTourController.restart();
+  });
+
   document.getElementById("api-base").addEventListener("change", () => {
     state.adminActionHistory = [];
     renderAdminResponseConsole();
@@ -1302,6 +1577,13 @@ const initapp = async () => {
 
   setPage(page);
   renderCharts();
+
+  if (!guidedTourController) {
+    guidedTourController = createGuidedTourController({
+      setPageFn: setPage,
+      getCurrentPageFn: getCurrentPageFromHash,
+    });
+  }
 
   if (!apiBaseInput.value && window.__API_BASE_URL__) {
     apiBaseInput.value = window.__API_BASE_URL__;
