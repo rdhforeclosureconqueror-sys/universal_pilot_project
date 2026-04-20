@@ -2,6 +2,7 @@
   color-scheme: light;
   --bg: #f4f6fb;
   --card: #ffffff;
+  --surface: #ffffff;
   --border: #d9e2ec;
   --text: #102a43;
   --muted: #52606d;
@@ -22,6 +23,7 @@ body {
   color-scheme: dark;
   --bg: #0f172a;
   --card: #111c33;
+  --surface: #111c33;
   --border: #23304d;
   --text: #f8fafc;
   --muted: #94a3b8;
@@ -397,20 +399,20 @@ button:disabled {
   position: fixed;
   inset: 0;
   background: rgba(2, 6, 23, 0.6);
-  z-index: 1100;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  padding: 20px;
+  z-index: 2100;
 }
 
 .tour-popover {
+  position: fixed;
   width: min(560px, calc(100vw - 40px));
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 14px;
   padding: 14px 16px;
   box-shadow: 0 20px 45px rgba(2, 6, 23, 0.35);
+  z-index: 2300;
+  max-height: min(420px, calc(100vh - 32px));
+  overflow: auto;
 }
 
 .tour-step-count {
@@ -437,7 +439,7 @@ button:disabled {
 
 .tour-target-active {
   position: relative;
-  z-index: 1101;
+  z-index: 2200;
   outline: 2px solid var(--primary);
   outline-offset: 2px;
   border-radius: 10px;
