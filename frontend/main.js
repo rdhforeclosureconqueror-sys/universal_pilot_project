@@ -737,9 +737,9 @@ const isMiniTourEligible = (tourKey) => {
 
 const ONBOARDING_PROMPT_CATALOG = Object.freeze({
   "suggest-analytics-after-cases-usage": {
-    title: "Use Analytics to prioritize next cases",
-    body: "You’ve started using Cases. Take a quick analytics mini-tour to spot trends and decide what to work next.",
-    primaryLabel: "Take Mini Tour",
+    title: "Prioritize next cases with Analytics",
+    body: "You’ve started in Cases. Take a quick Analytics mini-tour to spot trends and choose your next best action.",
+    primaryLabel: "Start Mini Tour",
     action: {
       type: "launchMiniTour",
       tourId: "data-mini-tour-v1",
@@ -749,7 +749,7 @@ const ONBOARDING_PROMPT_CATALOG = Object.freeze({
   "suggest-first-case-action": {
     title: "Ready for your first case action?",
     body: "Open Case Management and take one meaningful action to move a file forward.",
-    primaryLabel: "Show Me",
+    primaryLabel: "Open Cases",
     action: {
       type: "launchMiniTour",
       tourId: "cases-mini-tour-v1",
@@ -759,7 +759,7 @@ const ONBOARDING_PROMPT_CATALOG = Object.freeze({
   "suggest-map-after-dashboard-only-pattern": {
     title: "Explore the map view next",
     body: "You’ve mostly stayed on Dashboard. Open the map to identify property clusters and location opportunities.",
-    primaryLabel: "Go There",
+    primaryLabel: "Open Map",
     action: {
       type: "navigate",
       route: "map",
@@ -825,7 +825,7 @@ const createOnboardingPromptRuntime = ({
     </div>
     <p class="onboarding-prompt-body"></p>
     <div class="onboarding-prompt-actions">
-      <button type="button" class="ghost onboarding-prompt-secondary">Dismiss</button>
+      <button type="button" class="ghost onboarding-prompt-secondary">Not Now</button>
       <button type="button" class="primary onboarding-prompt-primary">Show Me</button>
     </div>
   `;
