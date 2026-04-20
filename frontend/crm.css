@@ -444,3 +444,49 @@ button:disabled {
   outline-offset: 2px;
   border-radius: 10px;
 }
+
+.onboarding-prompt {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  width: min(360px, calc(100vw - 24px));
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  padding: 14px;
+  z-index: 1900;
+}
+
+.onboarding-prompt-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.onboarding-prompt-title {
+  margin: 0;
+  font-size: 16px;
+}
+
+.onboarding-prompt-dismiss {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 8px;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.onboarding-prompt-body {
+  margin: 10px 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.onboarding-prompt-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
