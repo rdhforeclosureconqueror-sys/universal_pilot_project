@@ -64,6 +64,9 @@ const ONBOARDING_DEFAULT_STATE = Object.freeze({
     byPromptId: {},
     lastPromptAt: null,
   },
+  prompts: {
+    byId: {},
+  },
   miniTours: {
     cases: {
       status: "not_started",
@@ -242,6 +245,10 @@ const getOnboardingState = () => {
       promptHistory: {
         ...ONBOARDING_DEFAULT_STATE.promptHistory,
         ...(parsed.promptHistory || {}),
+      },
+      prompts: {
+        ...ONBOARDING_DEFAULT_STATE.prompts,
+        ...(parsed.prompts || {}),
       },
       miniTours: {
         ...ONBOARDING_DEFAULT_STATE.miniTours,
@@ -728,6 +735,345 @@ const isMiniTourEligible = (tourKey) => {
   return true;
 };
 
+const ONBOARDING_PROMPT_CATALOG = Object.freeze({
+  "suggest-analytics-after-cases-usage": {
+    title: "Use Analytics to prioritize next cases",
+    body: "You’ve started using Cases. Take a quick analytics mini-tour to spot trends and decide what to work next.",
+    primaryLabel: "Take Mini Tour",
+    action: {
+      type: "launchMiniTour",
+      tourId: "data-mini-tour-v1",
+      route: "data",
+    },
+  },
+  "suggest-first-case-action": {
+    title: "Ready for your first case action?",
+    body: "Open Case Management and take one meaningful action to move a file forward.",
+    primaryLabel: "Show Me",
+    action: {
+      type: "launchMiniTour",
+      tourId: "cases-mini-tour-v1",
+      route: "cases",
+    },
+  },
+  "suggest-map-after-dashboard-only-pattern": {
+    title: "Explore the map view next",
+    body: "You’ve mostly stayed on Dashboard. Open the map to identify property clusters and location opportunities.",
+    primaryLabel: "Go There",
+    action: {
+      type: "navigate",
+      route: "map",
+    },
+  },
+});
+
+const getPromptStateById = (onboardingState, promptId) =>
+  onboardingState?.prompts?.byId?.[promptId] || {};
+
+const updatePromptState = (promptId, updater) =>
+  updateOnboardingState((current) => {
+    if (!promptId || typeof updater !== "function") {
+      return null;
+    }
+    const currentPromptState = current?.prompts?.byId?.[promptId] || {};
+    const patch = updater(currentPromptState, current);
+    if (!patch) {
+      return null;
+    }
+    return {
+      prompts: {
+        ...(current.prompts || {}),
+        byId: {
+          ...(current.prompts?.byId || {}),
+          [promptId]: {
+            ...currentPromptState,
+            ...patch,
+          },
+        },
+      },
+      promptHistory: {
+        ...(current.promptHistory || {}),
+        lastPromptAt: new Date().toISOString(),
+      },
+    };
+  });
+
+const isFeatureStateAtLeast = (actualState, requiredState) => {
+  const actualRank = FEATURE_ADOPTION_RANK[actualState] ?? 0;
+  const requiredRank = FEATURE_ADOPTION_RANK[requiredState] ?? 0;
+  return actualRank >= requiredRank;
+};
+
+const createOnboardingPromptRuntime = ({
+  setPageFn,
+  getCurrentPageFn,
+  launchTourByIdFn,
+  isTourRunningFn,
+}) => {
+  const runtimeState = {
+    activePromptId: null,
+    routeHistory: [],
+  };
+
+  const container = document.createElement("aside");
+  container.className = "onboarding-prompt hidden";
+  container.setAttribute("aria-live", "polite");
+  container.innerHTML = `
+    <div class="onboarding-prompt-header">
+      <h3 class="onboarding-prompt-title"></h3>
+      <button type="button" class="onboarding-prompt-dismiss" aria-label="Dismiss onboarding prompt">×</button>
+    </div>
+    <p class="onboarding-prompt-body"></p>
+    <div class="onboarding-prompt-actions">
+      <button type="button" class="ghost onboarding-prompt-secondary">Dismiss</button>
+      <button type="button" class="primary onboarding-prompt-primary">Show Me</button>
+    </div>
+  `;
+  document.body.appendChild(container);
+
+  const titleElement = container.querySelector(".onboarding-prompt-title");
+  const bodyElement = container.querySelector(".onboarding-prompt-body");
+  const primaryButton = container.querySelector(".onboarding-prompt-primary");
+  const secondaryButton = container.querySelector(".onboarding-prompt-secondary");
+  const iconDismissButton = container.querySelector(".onboarding-prompt-dismiss");
+
+  const hidePrompt = () => {
+    runtimeState.activePromptId = null;
+    container.classList.add("hidden");
+  };
+
+  const markPromptShown = (promptId) => {
+    const nowIso = new Date().toISOString();
+    const onboardingState = getOnboardingState();
+    updatePromptState(promptId, (currentPromptState) => ({
+      shownCount: Number(currentPromptState.shownCount || 0) + 1,
+      lastShownAt: nowIso,
+      lastShownSessionCount: Number(onboardingState.sessionCount || 0),
+    }));
+    markSessionPromptSeen(promptId);
+  };
+
+  const markPromptDismissed = (promptId) => {
+    const nowIso = new Date().toISOString();
+    updatePromptState(promptId, () => ({
+      lastDismissedAt: nowIso,
+    }));
+    markSessionPromptSeen(promptId);
+  };
+
+  const markPromptActioned = (promptId) => {
+    const nowIso = new Date().toISOString();
+    updatePromptState(promptId, () => ({
+      lastActionedAt: nowIso,
+    }));
+    markSessionPromptSeen(promptId);
+  };
+
+  const hasDashboardOnlyRoutePattern = () => {
+    const usableRoutes = runtimeState.routeHistory.filter((route) =>
+      isNonLoginDashboardRoute(route),
+    );
+    if (!usableRoutes.length) {
+      return false;
+    }
+    return usableRoutes.every((route) => route === "dashboard");
+  };
+
+  const isPromptSuppressed = (rule, onboardingState) => {
+    if (!rule) {
+      return true;
+    }
+    const promptState = getPromptStateById(onboardingState, rule.id);
+    const sessionSeenIds = getSessionPromptIds();
+    const sessionCount = Number(onboardingState.sessionCount || 0);
+
+    if (rule.suppressIf?.guidedTourRunning && isTourRunningFn()) {
+      return true;
+    }
+
+    if (
+      ONBOARDING_SUPPRESSION_RULES.onePromptAtATime &&
+      runtimeState.activePromptId &&
+      runtimeState.activePromptId !== rule.id
+    ) {
+      return true;
+    }
+
+    if (
+      rule.suppressIf?.promptShownThisSession &&
+      ONBOARDING_SUPPRESSION_RULES.oncePerPromptPerSession &&
+      sessionSeenIds.includes(rule.id)
+    ) {
+      return true;
+    }
+
+    if (
+      rule.suppressIf?.promptCappedAcrossSessions &&
+      Number(promptState.shownCount || 0) >= ONBOARDING_SUPPRESSION_RULES.maxShowsPerPromptLifetime
+    ) {
+      return true;
+    }
+
+    if (
+      Number.isFinite(promptState.lastShownSessionCount) &&
+      sessionCount - Number(promptState.lastShownSessionCount) <
+        ONBOARDING_SUPPRESSION_RULES.minSessionsBetweenSamePrompt
+    ) {
+      return true;
+    }
+
+    if (rule.targetFeature === "cases" || rule.targetFeature === "data") {
+      const relatedMiniTourState = onboardingState?.miniTours?.[rule.targetFeature];
+      if (
+        relatedMiniTourState?.status === "completed" ||
+        relatedMiniTourState?.status === "dismissed"
+      ) {
+        return true;
+      }
+    }
+
+    return false;
+  };
+
+  const isPromptEligible = (rule, onboardingState) => {
+    if (!rule) {
+      return false;
+    }
+    const eligibility = rule.eligibility || {};
+    const sessionCount = Number(onboardingState.sessionCount || 0);
+
+    if (Number.isFinite(eligibility.minSessionCount) && sessionCount < eligibility.minSessionCount) {
+      return false;
+    }
+
+    const featureRequirements = eligibility.requiresFeatureState || {};
+    const hasFeatureRequirementFailure = Object.entries(featureRequirements).some(
+      ([featureKey, requiredState]) =>
+        !isFeatureStateAtLeast(
+          onboardingState.features?.[featureKey] || FEATURE_ADOPTION_STATES.NOT_SEEN,
+          requiredState,
+        ),
+    );
+    if (hasFeatureRequirementFailure) {
+      return false;
+    }
+
+    if (
+      eligibility.requiresMilestonePresent &&
+      !onboardingState.milestones?.[eligibility.requiresMilestonePresent]
+    ) {
+      return false;
+    }
+
+    if (
+      eligibility.requiresMilestoneMissing &&
+      onboardingState.milestones?.[eligibility.requiresMilestoneMissing]
+    ) {
+      return false;
+    }
+
+    if (eligibility.requiresRoutePattern === "dashboard_only" && !hasDashboardOnlyRoutePattern()) {
+      return false;
+    }
+
+    return !isPromptSuppressed(rule, onboardingState);
+  };
+
+  const selectHighestPriorityPrompt = () => {
+    if (isTourRunningFn()) {
+      return null;
+    }
+    const onboardingState = getOnboardingState();
+    const sortedRules = [...ONBOARDING_PROMPT_RULE_MATRIX].sort(
+      (a, b) => Number(b.priority || 0) - Number(a.priority || 0),
+    );
+    return (
+      sortedRules.find((rule) => isPromptEligible(rule, onboardingState) && ONBOARDING_PROMPT_CATALOG[rule.id]) ||
+      null
+    );
+  };
+
+  const executePromptAction = async (promptId) => {
+    const promptDefinition = ONBOARDING_PROMPT_CATALOG[promptId];
+    const action = promptDefinition?.action;
+    if (!action) {
+      return;
+    }
+    markPromptActioned(promptId);
+    hidePrompt();
+
+    if (action.route && getCurrentPageFn() !== action.route) {
+      window.location.hash = `#/${action.route}`;
+      setPageFn(action.route);
+      await new Promise((resolve) => window.setTimeout(resolve, 160));
+    }
+
+    if (action.type === "launchMiniTour" && action.tourId) {
+      await launchTourByIdFn(action.tourId, { force: false });
+    }
+  };
+
+  const showPrompt = (promptRule) => {
+    const promptDefinition = ONBOARDING_PROMPT_CATALOG[promptRule.id];
+    if (!promptDefinition) {
+      hidePrompt();
+      return;
+    }
+
+    runtimeState.activePromptId = promptRule.id;
+    titleElement.textContent = promptDefinition.title;
+    bodyElement.textContent = promptDefinition.body;
+    primaryButton.textContent = promptDefinition.primaryLabel || "Show Me";
+    container.classList.remove("hidden");
+    markPromptShown(promptRule.id);
+  };
+
+  primaryButton.addEventListener("click", async () => {
+    const promptId = runtimeState.activePromptId;
+    if (!promptId) {
+      return;
+    }
+    await executePromptAction(promptId);
+  });
+
+  const handleDismiss = () => {
+    const promptId = runtimeState.activePromptId;
+    if (!promptId) {
+      return;
+    }
+    markPromptDismissed(promptId);
+    hidePrompt();
+  };
+
+  secondaryButton.addEventListener("click", handleDismiss);
+  iconDismissButton.addEventListener("click", handleDismiss);
+
+  return {
+    recordRouteVisit: (routeKey) => {
+      if (!routeKey) {
+        return;
+      }
+      runtimeState.routeHistory = [...runtimeState.routeHistory, routeKey].slice(-30);
+    },
+    evaluateAndRender: () => {
+      if (isTourRunningFn()) {
+        hidePrompt();
+        return;
+      }
+      const selectedPrompt = selectHighestPriorityPrompt();
+      if (!selectedPrompt) {
+        hidePrompt();
+        return;
+      }
+      if (runtimeState.activePromptId === selectedPrompt.id) {
+        return;
+      }
+      showPrompt(selectedPrompt);
+    },
+    hide: hidePrompt,
+  };
+};
+
 const createGuidedTourController = ({ setPageFn, getCurrentPageFn }) => {
   const state = {
     running: false,
@@ -924,6 +1270,7 @@ const createGuidedTourController = ({ setPageFn, getCurrentPageFn }) => {
     if (!state.steps.length) {
       return false;
     }
+    onboardingPromptRuntime?.hide();
     if (tourConfig.type === "global") {
       markOnboardingMilestone(ONBOARDING_MILESTONES.ONBOARDING_STARTED);
     }
@@ -973,6 +1320,7 @@ const createGuidedTourController = ({ setPageFn, getCurrentPageFn }) => {
       state.activeTourId = null;
       state.activeTourType = null;
       state.steps = [];
+      window.setTimeout(() => onboardingPromptRuntime?.evaluateAndRender(), 120);
       return;
     }
     if (!wasRunning || state.completionState === "completed") {
@@ -988,6 +1336,7 @@ const createGuidedTourController = ({ setPageFn, getCurrentPageFn }) => {
     state.activeTourId = null;
     state.activeTourType = null;
     state.steps = [];
+    window.setTimeout(() => onboardingPromptRuntime?.evaluateAndRender(), 120);
   };
 
   const restart = async ({ tourId = "global-tour-v1" } = {}) => {
@@ -1069,6 +1418,7 @@ const getCurrentPageFromHash = () => window.location.hash.replace("#/", "") || "
 
 let guidedTourController = null;
 let autoTourAttempted = false;
+let onboardingPromptRuntime = null;
 
 const isNonLoginDashboardRoute = (page) =>
   Boolean(page && page !== "login" && pages[page]);
@@ -1461,6 +1811,7 @@ const setPage = (pageId) => {
   document.getElementById("page-subtitle").textContent =
     pages[pageKey].subtitle;
   trackOnboardingForRoute(pageKey);
+  onboardingPromptRuntime?.recordRouteVisit(pageKey);
 };
 
 const validateUuid = (value) => uuidPattern.test(value.trim());
@@ -2371,8 +2722,9 @@ const wireEvents = () => {
   window.addEventListener("hashchange", () => {
     const page = window.location.hash.replace("#/", "");
     setPage(page || "dashboard");
-    window.setTimeout(() => {
-      maybeAutoStartGuidedTour();
+    window.setTimeout(async () => {
+      await maybeAutoStartGuidedTour();
+      onboardingPromptRuntime?.evaluateAndRender();
     }, 120);
   });
 };
@@ -2387,6 +2739,14 @@ const initapp = async () => {
     guidedTourController = createGuidedTourController({
       setPageFn: setPage,
       getCurrentPageFn: getCurrentPageFromHash,
+    });
+  }
+  if (!onboardingPromptRuntime) {
+    onboardingPromptRuntime = createOnboardingPromptRuntime({
+      setPageFn: setPage,
+      getCurrentPageFn: getCurrentPageFromHash,
+      launchTourByIdFn: (tourId, options) => guidedTourController?.launchTourById(tourId, options),
+      isTourRunningFn: () => guidedTourController?.isRunning() || false,
     });
   }
   window.crmTourApi = {
@@ -2496,6 +2856,7 @@ const initapp = async () => {
   setPage(currentPage || "dashboard");
   maybeIncrementOnboardingSessionCount(currentPage || "dashboard");
   await maybeAutoStartGuidedTour();
+  onboardingPromptRuntime?.evaluateAndRender();
 };
 
 initapp().catch((error) => {
