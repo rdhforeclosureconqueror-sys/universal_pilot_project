@@ -87,12 +87,15 @@
 
     <section class="card hidden" id="confirmation">
       <h3>Submission received</h3>
+      <p><strong>Case ID:</strong> <span id="confirmation-case-id">—</span></p>
       <p id="confirmation-message"></p>
+      <p><strong>You did the right thing by reaching out early.</strong> Your case is now in our active review queue.</p>
       <ul>
-        <li>We review your case and foreclosure stage.</li>
-        <li>An operator contacts you using your preferred details.</li>
-        <li>We coordinate the next safe action path based on your timeline.</li>
+        <li>Step 1: We review your intake details and foreclosure stage.</li>
+        <li>Step 2: A housing operator confirms your timeline and documents.</li>
+        <li>Step 3: We contact you with the safest next-step options for your case.</li>
       </ul>
+      <p>We will contact you at the email and phone number you provided. Your case is being reviewed.</p>
     </section>
   </div>
 
@@ -138,7 +141,8 @@
     responseEl.textContent = payload.message || 'Unable to submit intake.';
     if (response.ok) {
       document.getElementById('confirmation').classList.remove('hidden');
-      document.getElementById('confirmation-message').textContent = `Case ${payload.case_id} was created. Expect outreach within 1 business day.`;
+      document.getElementById('confirmation-case-id').textContent = payload.case_id || '—';
+      document.getElementById('confirmation-message').textContent = `Case ${payload.case_id} was created successfully. Expect outreach within 1 business day.`;
     }
   });
 

@@ -40,6 +40,7 @@
           <a href="#/data" data-page="data" class="nav-link">Data Tables</a>
           <a href="/static/admin-dev.html" class="nav-link">Admin / Dev Console</a>
           <a href="#/admin-command-center" data-page="admin-command-center" class="nav-link">Admin → Command Center</a>
+          <a href="/admin/workspaces/foreclosure" class="nav-link">Admin → Foreclosure Workspace</a>
         </nav>
         <div class="sidebar-footer">
           <label class="field">
@@ -582,7 +583,10 @@
               <h3 style="margin: 0;">Admin Command Center</h3>
               <p class="hint" style="margin: 6px 0 0;">One-click access to platform capabilities and AI automation.</p>
             </div>
-            <button type="button" class="ghost" id="admin-logout">Logout</button>
+            <div style="display: flex; gap: 10px; align-items: center;">
+              <a href="/admin/workspaces/foreclosure" class="ghost" style="text-decoration: none; padding: 8px 12px; border-radius: 8px;">Open Foreclosure Workspace</a>
+              <button type="button" class="ghost" id="admin-logout">Logout</button>
+            </div>
           </div>
           <div class="grid two">
             <div id="admin-capability-panels" class="admin-capability-grid"></div>
