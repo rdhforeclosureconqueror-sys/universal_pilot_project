@@ -19,7 +19,7 @@
 
   <body class="theme-light">
     <div class="app-shell">
-      <aside class="sidebar">
+      <aside class="sidebar" data-tour="main-navigation">
         <div class="brand">
           <span class="brand-mark">UP</span>
           <div>
@@ -51,12 +51,13 @@
       </aside>
 
     <main class="content">
-  <header class="topbar">
+  <header class="topbar" data-tour="topbar-actions">
     <div>
       <h2 id="page-title">Operator Dashboard</h2>
       <p id="page-subtitle">Status-aware overview of your operations.</p>
     </div>
     <div class="actions">
+      <button type="button" id="tour-replay" class="ghost" data-tour="tour-replay-button">Take Tour</button>
       <button type="button" id="theme-toggle" class="ghost">Toggle Theme</button>
     </div>
   </header>
@@ -83,7 +84,7 @@
     </div>
   </section>
 
-  <section class="page" data-page="dashboard">
+  <section class="page" data-page="dashboard" data-tour="dashboard-overview">
     <div class="grid two">
       <div class="card">
         <h3>Operational Metrics</h3>
@@ -137,7 +138,7 @@
     <div class="chart-grid" data-charts="dashboard"></div>
   </section>
 
-        <section class="page" data-page="cases">
+  <section class="page" data-page="cases" data-tour="cases-workspace">
           <div class="grid two">
             <div class="card">
               <h3>Case Filters</h3>
@@ -271,7 +272,7 @@
           <div class="chart-grid" data-charts="properties"></div>
         </section>
 
-        <section class="page" data-page="map">
+        <section class="page" data-page="map" data-tour="map-panel">
           <div class="card full">
             <div class="map-header">
               <div>
@@ -481,7 +482,7 @@
           <div class="chart-grid" data-charts="audit"></div>
         </section>
 
-        <section class="page" data-page="data">
+        <section class="page" data-page="data" data-tour="analytics-panel">
           <div class="grid two">
             <div class="card table-card">
               <div class="table-header">
@@ -575,7 +576,7 @@
           <div class="chart-grid" data-charts="data"></div>
         </section>
 
-        <section class="page" data-page="admin-command-center">
+        <section class="page" data-page="admin-command-center" data-tour="admin-command-center">
           <div class="card full" style="display: flex; justify-content: space-between; align-items: center;">
             <div>
               <h3 style="margin: 0;">Admin Command Center</h3>
