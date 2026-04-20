@@ -10,25 +10,35 @@
     .list-item { padding: 10px; border: 1px solid #d9e2ec; border-radius: 10px; margin-bottom: 8px; cursor: pointer; }
     .list-item.active { border-color: #1f7aec; background: #f0f7ff; }
     .pill { font-size: 12px; border: 1px solid #cbd2d9; border-radius: 999px; padding: 2px 8px; }
+    .status-banner { margin-bottom: 12px; padding: 10px; border-radius: 8px; border: 1px solid #d9e2ec; background: #f8fafc; }
+    .status-banner.warning { background: #fff8e1; border-color: #ffecb3; }
+    .status-banner.success { background: #edf7ed; border-color: #c8e6c9; }
+    .status-banner.error { background: #fdecea; border-color: #f5c2c7; }
+    .list-meta { margin-top: 6px; display: flex; gap: 6px; flex-wrap: wrap; }
+    .pill.urgent { background: #ffe6e6; border-color: #ffb3b3; color: #7a1212; }
+    .pill.high { background: #fff2cc; border-color: #ffe08a; color: #6b5300; }
+    .pill.medium { background: #e6f4ff; border-color: #b3daff; color: #0d3a62; }
+    .helper-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 10px; }
   </style>
 </head>
 <body>
   <header>
-    <h1>Foreclosure Workspace (Operator MVP)</h1>
+    <h1>Foreclosure Workspace</h1>
     <p>List → detail → actions workflow for active foreclosure cases.</p>
   </header>
 
   <section class="card">
-    <label class="field" style="max-width: 520px;">
-      <span>Operator bearer token</span>
-      <input id="token" placeholder="Paste access token from /auth/login" />
-    </label>
-    <button class="primary" id="load-cases">Load Foreclosure Cases</button>
+    <div id="session-status" class="status-banner"></div>
+    <div class="helper-row">
+      <button class="primary" id="load-cases">Refresh Foreclosure Cases</button>
+      <a href="/#/admin-command-center">Back to Command Center</a>
+    </div>
   </section>
 
   <section class="layout">
     <article class="card">
       <h3>Case List</h3>
+      <p class="hint">Click a case card to open details and run actions.</p>
       <div id="case-list"></div>
     </article>
 
@@ -55,25 +65,90 @@
   </section>
 
 <script>
+  const AUTH_TOKEN_KEY = 'auth_token';
   let selectedCaseId = null;
   const listEl = document.getElementById('case-list');
+  const sessionStatusEl = document.getElementById('session-status');
+  const actionResponseEl = document.getElementById('action-response');
+  const STAGE_PRIORITY = {
+    pre_foreclosure: 1,
+    notice_of_default: 2,
+    auction_scheduled: 3,
+    post_sale: 4,
+  };
+
+  function setSessionStatus(message, kind = '') {
+    sessionStatusEl.textContent = message;
+    sessionStatusEl.className = `status-banner ${kind}`.trim();
+  }
+
+  function setActionFeedback(message, kind = '') {
+    actionResponseEl.textContent = message;
+    actionResponseEl.className = `response ${kind}`.trim();
+  }
 
   function authHeaders() {
-    const token = document.getElementById('token').value.trim();
-    return { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` };
+    const token = localStorage.getItem(AUTH_TOKEN_KEY) || '';
+    return { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) };
+  }
+
+  function resolveUrgency(row) {
+    const stage = (row.foreclosure_stage || '').toLowerCase();
+    if (stage === 'auction_scheduled' || stage === 'post_sale') return { label: 'Urgency: urgent', tone: 'urgent' };
+    if (stage === 'notice_of_default') return { label: 'Urgency: high', tone: 'high' };
+    return { label: 'Urgency: medium', tone: 'medium' };
+  }
+
+  function sortedCases(rows) {
+    return [...rows].sort((a, b) => {
+      const aPriority = STAGE_PRIORITY[(a.foreclosure_stage || '').toLowerCase()] || 0;
+      const bPriority = STAGE_PRIORITY[(b.foreclosure_stage || '').toLowerCase()] || 0;
+      if (bPriority !== aPriority) return bPriority - aPriority;
+      return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+    });
   }
 
   async function loadCases() {
+    setSessionStatus('Loading foreclosure workspace cases...', 'warning');
     const response = await fetch('/foreclosure/workspace/cases', { headers: authHeaders() });
     const payload = await response.json();
     listEl.innerHTML = '';
-    payload.forEach((row) => {
+
+    if (!response.ok) {
+      setSessionStatus(payload.detail || 'Unable to load cases. Sign in from the main system and try again.', 'error');
+      return;
+    }
+
+    const rows = sortedCases(Array.isArray(payload) ? payload : []);
+    if (!rows.length) {
+      setSessionStatus('Connected. No foreclosure workspace cases yet.', 'success');
+      listEl.innerHTML = '<p class="hint">No cases yet. New intake submissions will appear here.</p>';
+      return;
+    }
+
+    rows.forEach((row) => {
+      const urgency = resolveUrgency(row);
       const item = document.createElement('div');
       item.className = 'list-item';
-      item.innerHTML = `<strong>${row.property_address}</strong><br/><span class="pill">${row.foreclosure_stage || 'unknown stage'}</span><br/><small>${row.city || ''}, ${row.state || ''}</small>`;
+      item.dataset.caseId = row.case_id;
+      item.innerHTML = `
+        <strong>${row.property_address || 'Unknown property'}</strong><br/>
+        <small>${row.city || ''}, ${row.state || ''}</small>
+        <div class="list-meta">
+          <span class="pill">${row.foreclosure_stage || 'unknown stage'}</span>
+          <span class="pill ${urgency.tone}">${urgency.label}</span>
+        </div>
+      `;
       item.addEventListener('click', () => selectCase(row.case_id, item));
       listEl.appendChild(item);
     });
+    if (selectedCaseId) {
+      const activeItem = document.querySelector(`.list-item[data-case-id="${selectedCaseId}"]`);
+      if (activeItem) {
+        await selectCase(selectedCaseId, activeItem);
+      }
+    }
+    setSessionStatus('Connected. Cases loaded using your active admin session token.', 'success');
   }
 
   async function selectCase(caseId, itemEl) {
@@ -81,10 +156,16 @@
     document.querySelectorAll('.list-item').forEach((el) => el.classList.remove('active'));
     itemEl.classList.add('active');
 
+    setActionFeedback('Loading case detail...', 'warning');
     const response = await fetch(`/foreclosure/workspace/cases/${caseId}`, { headers: authHeaders() });
     const payload = await response.json();
+    if (!response.ok) {
+      setActionFeedback(payload.detail || 'Unable to load case detail.', 'error');
+      return;
+    }
     const p = payload.profile || {};
     document.getElementById('case-detail').innerHTML = `
+      <strong>Case ID:</strong> ${payload.case_id || '—'}<br/>
       <strong>Property:</strong> ${p.property_address || '—'}, ${p.city || '—'}, ${p.state || '—'}<br/>
       <strong>Foreclosure stage:</strong> ${p.foreclosure_stage || '—'}<br/>
       <strong>Loan balance:</strong> ${p.loan_balance ?? '—'}<br/>
@@ -106,13 +187,18 @@
       li.textContent = `${a.created_at || '—'} — ${a.action_type} (${a.reason_code})`;
       auditEl.appendChild(li);
     });
+    setActionFeedback('Case detail loaded. You can run Analyze Property or Trigger Next Step.', 'success');
   }
 
   document.getElementById('load-cases').addEventListener('click', loadCases);
 
   document.getElementById('analyze-form').addEventListener('submit', async (event) => {
     event.preventDefault();
-    if (!selectedCaseId) return;
+    if (!selectedCaseId) {
+      setActionFeedback('Select a case before running Analyze Property.', 'warning');
+      return;
+    }
+    setActionFeedback('Running analysis...', 'warning');
     const data = Object.fromEntries(new FormData(event.target).entries());
     ["estimated_property_value", "loan_balance", "arrears_amount", "homeowner_income"].forEach((f) => {
       if (data[f] !== '') data[f] = Number(data[f]); else delete data[f];
@@ -122,18 +208,41 @@
       method: 'POST', headers: authHeaders(), body: JSON.stringify(data),
     });
     const payload = await response.json();
-    document.getElementById('action-response').textContent = `Classification: ${payload.classification || '—'} | Rescue Score: ${payload.rescue_score ?? '—'} | Acquisition Score: ${payload.acquisition_score ?? '—'}`;
+    if (!response.ok) {
+      setActionFeedback(payload.detail || 'Analyze action failed.', 'error');
+      return;
+    }
+    setActionFeedback(`Analysis complete. Classification: ${payload.classification || '—'} | Rescue Score: ${payload.rescue_score ?? '—'} | Acquisition Score: ${payload.acquisition_score ?? '—'}`, 'success');
+    const activeItem = document.querySelector('.list-item.active');
+    if (activeItem) await selectCase(selectedCaseId, activeItem);
   });
 
   document.getElementById('next-step').addEventListener('click', async () => {
-    if (!selectedCaseId) return;
+    if (!selectedCaseId) {
+      setActionFeedback('Select a case before triggering next step.', 'warning');
+      return;
+    }
+    setActionFeedback('Updating case to the next foreclosure step...', 'warning');
     const response = await fetch(`/foreclosure/workspace/cases/${selectedCaseId}/actions/next-step`, {
       method: 'POST', headers: authHeaders(),
     });
     const payload = await response.json();
-    document.getElementById('action-response').textContent = `Next stage: ${payload.next_stage || '—'}. Partner referral status: ${payload.partner_referral_status || '—'}.`;
+    if (!response.ok) {
+      setActionFeedback(payload.detail || 'Next-step action failed.', 'error');
+      return;
+    }
+    setActionFeedback(`Next step complete. Updated stage: ${payload.next_stage || '—'}. Partner referral status: ${payload.partner_referral_status || '—'}.`, 'success');
     await loadCases();
+    const activeItem = document.querySelector(`.list-item[data-case-id="${selectedCaseId}"]`);
+    if (activeItem) await selectCase(selectedCaseId, activeItem);
   });
+
+  if (localStorage.getItem(AUTH_TOKEN_KEY)) {
+    setSessionStatus('Using active sign-in session from Universal Pilot CRM.', 'success');
+    loadCases();
+  } else {
+    setSessionStatus('No active session found. Sign in at /#/login (or /#/admin-command-center), then return here.', 'warning');
+  }
 </script>
 </body>
 </html>
