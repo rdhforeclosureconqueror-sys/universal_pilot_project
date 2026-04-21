@@ -12,6 +12,8 @@ const state = {
   detailMapInstance: null,
   propertyList: [],
   adminActionHistory: [],
+  currentUserId: "",
+  lastCreatedCase: null,
 };
 
 const uuidPattern =
@@ -23,6 +25,7 @@ const TOUR_COMPLETED_KEY = "guided_tour_completed_v1";
 const TOUR_DISMISSED_KEY = "guided_tour_dismissed_v1";
 const ONBOARDING_STATE_STORAGE_KEY = "onboarding_state_v1";
 const ONBOARDING_SESSION_PROMPTS_KEY = "onboarding_prompt_session_seen_v1";
+const CASES_WORKSPACE_TOUR_PROMPT_KEY = "workspace_tour_prompted_cases_v1";
 const ONBOARDING_SCHEMA_VERSION = 1;
 
 // Phase A1: onboarding/adoption config contract (schema + rules only, no UI/runtime wiring yet).
@@ -636,6 +639,15 @@ const TOUR_REGISTRY = Object.freeze({
         target: '[data-tour="cases-detail-panel"]',
         title: "First Meaningful Action",
         body: "Load a case in Case Detail, then complete a consent or referral action to move the case forward.",
+        page: "cases",
+        optional: false,
+        skipIfMissing: true,
+      },
+      {
+        id: "cases-mini-create",
+        target: '[data-tour="cases-create-panel"]',
+        title: "Create and Handoff",
+        body: "Create a new case here, confirm the case ID, then hand off to the right workspace to continue execution.",
         page: "cases",
         optional: false,
         skipIfMissing: true,
@@ -1339,9 +1351,9 @@ const createGuidedTourController = ({ setPageFn, getCurrentPageFn }) => {
     window.setTimeout(() => onboardingPromptRuntime?.evaluateAndRender(), 120);
   };
 
-  const restart = async ({ tourId = "global-tour-v1" } = {}) => {
+  const restart = async () => {
     stop({ markComplete: false });
-    await start({ tourId, restart: true });
+    await start({ restart: true });
   };
 
   nextButton.addEventListener("click", () => {
@@ -1414,6 +1426,15 @@ const getApiBase = () => {
   return configured.endsWith("/") ? configured.slice(0, -1) : configured;
 };
 
+const requestWithAuth = async (url, options = {}) => {
+  const headers = new Headers(options.headers || {});
+  const token = getAuthToken();
+  if (token && !headers.has("Authorization")) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+  return fetch(url, { ...options, headers });
+};
+
 const getCurrentPageFromHash = () => window.location.hash.replace("#/", "") || "dashboard";
 
 let guidedTourController = null;
@@ -1457,6 +1478,47 @@ const maybeAutoStartGuidedTour = async () => {
 
   autoTourAttempted = true;
   await guidedTourController.start();
+};
+
+const maybeAutoPromptCasesWorkspaceTour = () => {
+  if (getCurrentPageFromHash() !== "cases" || !guidedTourController || guidedTourController.isRunning()) {
+    return;
+  }
+  if (localStorage.getItem(CASES_WORKSPACE_TOUR_PROMPT_KEY) === "true") {
+    return;
+  }
+  localStorage.setItem(CASES_WORKSPACE_TOUR_PROMPT_KEY, "true");
+  window.setTimeout(() => {
+    if (getCurrentPageFromHash() === "cases") {
+      guidedTourController.launchTourById("cases-mini-tour-v1", { force: true });
+    }
+  }, 250);
+};
+
+const preloadCurrentUserForCaseCreate = async () => {
+  const createdByInput = document.querySelector('#case-create-form input[name="created_by"]');
+  if (!createdByInput) {
+    return;
+  }
+  const token = getAuthToken();
+  if (!token) {
+    createdByInput.value = "";
+    createdByInput.placeholder = "Sign in to auto-fill Created By";
+    return;
+  }
+  try {
+    const response = await requestWithAuth(`${getApiBase()}/auth/me`);
+    if (!response.ok) {
+      return;
+    }
+    const payload = await response.json();
+    if (payload?.user_id) {
+      state.currentUserId = payload.user_id;
+      createdByInput.value = payload.user_id;
+    }
+  } catch (error) {
+    console.warn("Unable to preload /auth/me for case creation", error);
+  }
 };
 
 const fetchOpenApi = async () => {
@@ -2282,6 +2344,141 @@ const loadTopDeals = async () => {
   }
 };
 
+const parseCaseMeta = (metaRaw) => {
+  if (!metaRaw.trim()) {
+    return null;
+  }
+  return JSON.parse(metaRaw);
+};
+
+const renderCaseCreateResult = ({ caseId, status, message, isError = false } = {}) => {
+  const container = document.getElementById("case-create-result");
+  if (!container) {
+    return;
+  }
+  clearElement(container);
+  if (!message && !caseId) {
+    return;
+  }
+  const panel = document.createElement("div");
+  panel.className = "panel";
+  panel.innerHTML = isError
+    ? `<strong>Case creation failed:</strong> ${message || "Unknown error"}`
+    : `<strong>Case created:</strong> ${caseId || "—"}<br/><strong>Status:</strong> ${status || "—"}${message ? `<br/><small>${message}</small>` : ""}`;
+  container.appendChild(panel);
+};
+
+const syncCaseDetailFromCreatedCase = (createdCase) => {
+  if (!createdCase?.id) {
+    return;
+  }
+  const caseIdInput = document.querySelector("#case-detail-form input[name='case_id']");
+  if (caseIdInput) {
+    caseIdInput.value = createdCase.id;
+  }
+  const detail = document.getElementById("case-detail");
+  if (detail) {
+    clearElement(detail);
+    detail.append(
+      createPanel("Case ID", createdCase.id),
+      createPanel("Status", createdCase.status || "—"),
+      createPanel("Program Key", createdCase.program_key || "—"),
+      createPanel("Created By", createdCase.created_by || "—"),
+      createPanel("Created At", createdCase.created_at || new Date().toISOString()),
+    );
+  }
+  const timeline = document.getElementById("case-timeline");
+  if (timeline) {
+    clearElement(timeline);
+    timeline.appendChild(
+      createPanel(
+        "Lifecycle Event",
+        `Case created (${createdCase.status || "unknown"})`,
+      ),
+    );
+  }
+  document.getElementById("case-detail-empty").textContent = "";
+  document.getElementById("case-timeline-empty").textContent = "";
+  updateValidation();
+};
+
+const updateCaseHandoffLinks = (programKey = "") => {
+  const handoff = document.getElementById("case-handoff-links");
+  if (!handoff) {
+    return;
+  }
+  handoff.classList.remove("hidden");
+  const normalized = String(programKey || "").toLowerCase();
+  const foreclosure = document.getElementById("handoff-foreclosure");
+  const essential = document.getElementById("handoff-essential-worker");
+  const veteran = document.getElementById("handoff-veteran");
+  [foreclosure, essential, veteran].forEach((link) => link?.classList.remove("primary"));
+  if (normalized.includes("foreclosure") && foreclosure) {
+    foreclosure.classList.add("primary");
+  } else if (normalized.includes("essential") && essential) {
+    essential.classList.add("primary");
+  } else if (normalized.includes("veteran") && veteran) {
+    veteran.classList.add("primary");
+  }
+};
+
+const handleCaseCreate = async (event) => {
+  event.preventDefault();
+  const form = event.target;
+  const submitButton = document.getElementById("case-create-submit");
+  submitButton.disabled = true;
+  renderCaseCreateResult({ message: "Submitting case creation...", isError: false });
+  try {
+    const payload = {
+      program_key: form.program_key.value.trim(),
+      created_by: form.created_by.value.trim(),
+      meta: parseCaseMeta(form.meta.value.trim()),
+    };
+    const response = await requestWithAuth(`${getApiBase()}/cases`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const responseText = await response.text();
+    let result = {};
+    try {
+      result = JSON.parse(responseText);
+    } catch (error) {
+      result = { detail: responseText };
+    }
+    if (!response.ok) {
+      renderCaseCreateResult({
+        isError: true,
+        message: result.detail || `HTTP ${response.status}`,
+      });
+      return;
+    }
+    const createdCase = {
+      id: result.id,
+      status: result.status,
+      program_key: payload.program_key,
+      created_by: payload.created_by,
+      created_at: new Date().toISOString(),
+    };
+    state.lastCreatedCase = createdCase;
+    renderCaseCreateResult({
+      caseId: createdCase.id,
+      status: createdCase.status,
+      message: "Case ID generated and ready for workspace handoff.",
+    });
+    syncCaseDetailFromCreatedCase(createdCase);
+    updateCaseHandoffLinks(payload.program_key);
+    trackCasesAdoptionAction();
+  } catch (error) {
+    renderCaseCreateResult({
+      isError: true,
+      message: error?.message || "Unable to submit case creation request.",
+    });
+  } finally {
+    submitButton.disabled = false;
+  }
+};
+
 const handleDocumentUpload = async (event) => {
   event.preventDefault();
   const form = event.target;
@@ -2444,6 +2641,15 @@ const updateDocumentFields = () => {
 };
 
 const updateValidation = () => {
+  const caseCreateForm = document.getElementById("case-create-form");
+  if (caseCreateForm) {
+    const createButton = document.getElementById("case-create-submit");
+    const programKey = caseCreateForm.program_key.value.trim();
+    const createdBy = caseCreateForm.created_by.value.trim();
+    createButton.disabled =
+      !programKey || !validateUuid(createdBy) || !validateJson(caseCreateForm.meta.value);
+  }
+
   const docForm = document.getElementById("document-upload-form");
   const docButton = document.getElementById("document-upload-submit");
   const docType = docForm.doc_type.value;
@@ -2542,6 +2748,11 @@ const updateValidation = () => {
 
 
 const wireEvents = () => {
+  const caseCreateForm = document.getElementById("case-create-form");
+  if (caseCreateForm) {
+    caseCreateForm.addEventListener("submit", handleCaseCreate);
+  }
+
   const caseFilterForm = document.getElementById("case-filter-form");
   if (caseFilterForm) {
     caseFilterForm.addEventListener("submit", () => {
@@ -2639,8 +2850,15 @@ const wireEvents = () => {
     if (!guidedTourController) {
       return;
     }
-    guidedTourController.restart({ tourId: "global-tour-v1" });
+    guidedTourController.restart();
   });
+
+  const casesTourReplay = document.getElementById("cases-tour-replay");
+  if (casesTourReplay) {
+    casesTourReplay.addEventListener("click", () => {
+      guidedTourController?.launchTourById("cases-mini-tour-v1", { force: true });
+    });
+  }
 
   document.getElementById("api-base").addEventListener("change", () => {
     state.adminActionHistory = [];
@@ -2724,6 +2942,7 @@ const wireEvents = () => {
     setPage(page || "dashboard");
     window.setTimeout(async () => {
       await maybeAutoStartGuidedTour();
+      maybeAutoPromptCasesWorkspaceTour();
       onboardingPromptRuntime?.evaluateAndRender();
     }, 120);
   });
@@ -2802,6 +3021,7 @@ const initapp = async () => {
   updateMapStatus();
   updatePropertyDetailState();
   renderAdminCommandCenter();
+  await preloadCurrentUserForCaseCreate();
 
   const referralList = document.getElementById("referral-status-list");
   clearElement(referralList);
@@ -2856,6 +3076,7 @@ const initapp = async () => {
   setPage(currentPage || "dashboard");
   maybeIncrementOnboardingSessionCount(currentPage || "dashboard");
   await maybeAutoStartGuidedTour();
+  maybeAutoPromptCasesWorkspaceTour();
   onboardingPromptRuntime?.evaluateAndRender();
 };
 

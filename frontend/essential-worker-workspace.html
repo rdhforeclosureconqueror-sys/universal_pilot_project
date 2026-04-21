@@ -20,7 +20,7 @@
 </head>
 <body>
   <header>
-    <h1>Essential Worker Workspace</h1>
+    <h1 data-tour="workspace-header">Essential Worker Workspace</h1>
     <p>List → detail → actions workflow for active essential worker housing cases.</p>
   </header>
 
@@ -28,18 +28,19 @@
     <div id="session-status" class="status-banner"></div>
     <div class="helper-row">
       <button class="primary" id="load-cases">Refresh Essential Worker Cases</button>
+      <button class="ghost" id="workspace-tour">Take Workspace Tour</button>
       <a href="/#/admin-command-center">Back to Command Center</a>
     </div>
   </section>
 
   <section class="layout">
-    <article class="card">
+    <article class="card" data-tour="workspace-list">
       <h3>Case List</h3>
       <p class="hint">Click a case card to open details and run actions.</p>
       <div id="case-list"></div>
     </article>
 
-    <article class="card">
+    <article class="card" data-tour="workspace-detail">
       <h3>Case Detail</h3>
       <div id="case-detail">Select a case to view profile, programs, and contact snapshot.</div>
       <h4>Program visibility</h4>
@@ -48,7 +49,7 @@
       <ul id="audit"></ul>
     </article>
 
-    <article class="card">
+    <article class="card" data-tour="workspace-actions">
       <h3>Actions</h3>
       <button class="primary" id="discover-programs">Discover Programs</button>
       <button class="ghost" id="generate-plan">Generate Plan</button>
@@ -208,8 +209,21 @@
     setActionFeedback(`Plan generated. Next steps: ${(payload.steps || []).join(' | ') || '—'}`, 'success');
   });
 
+  const workspaceTour = WorkspaceApi.createWorkspaceTour({
+    workspaceKey: 'essential-worker',
+    title: 'Essential Worker Workspace Tour',
+    steps: [
+      { target: '[data-tour="workspace-header"]', title: 'Load Worker Cases', body: 'Refresh the queue to pull eligible essential worker cases.' },
+      { target: '[data-tour="workspace-list"]', title: 'Select a Worker Profile', body: 'Choose a case from the list to inspect income and location context.' },
+      { target: '[data-tour="workspace-detail"]', title: 'Review Programs and Audit', body: 'Validate benefits visibility and audit history before taking action.' },
+      { target: '[data-tour="workspace-actions"]', title: 'Discover and Plan', body: 'Run Discover Programs, then Generate Plan to move the case toward execution.' },
+    ],
+  });
+  document.getElementById('workspace-tour').addEventListener('click', () => workspaceTour?.start());
+
   if (WorkspaceApi.tokenExists()) {
     setSessionStatus('Using active sign-in session from Universal Pilot CRM.', 'success');
+    workspaceTour?.autoPromptOnce();
     loadCases();
   } else {
     signedOutState();

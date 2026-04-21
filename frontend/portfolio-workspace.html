@@ -19,7 +19,7 @@
 </head>
 <body>
   <header>
-    <h1>Portfolio Workspace</h1>
+    <h1 data-tour="workspace-header">Portfolio Workspace</h1>
     <p>Portfolio asset list → selected property detail → value, loans, equity summary.</p>
   </header>
 
@@ -27,24 +27,25 @@
     <div id="session-status" class="status-banner"></div>
     <div class="helper-row">
       <button class="primary" id="load-assets">Refresh Portfolio</button>
+      <button class="ghost" id="workspace-tour">Take Workspace Tour</button>
       <a href="/#/admin-command-center">Back to Command Center</a>
     </div>
   </section>
 
   <section class="layout">
-    <article class="card">
+    <article class="card" data-tour="workspace-list">
       <h3>Portfolio Assets</h3>
       <div id="asset-list"></div>
     </article>
 
-    <article class="card">
+    <article class="card" data-tour="workspace-detail">
       <h3>Asset Detail</h3>
       <div id="asset-detail">Select an asset to view portfolio context.</div>
       <h4>Case / Property Context</h4>
       <ul id="case-context"></ul>
     </article>
 
-    <article class="card">
+    <article class="card" data-tour="workspace-actions">
       <h3>Portfolio Summary</h3>
       <div id="summary-cards"></div>
       <div class="response" id="action-response"></div>
@@ -172,8 +173,21 @@
 
   document.getElementById('load-assets').addEventListener('click', loadAssets);
 
+  const workspaceTour = WorkspaceApi.createWorkspaceTour({
+    workspaceKey: 'portfolio',
+    title: 'Portfolio Workspace Tour',
+    steps: [
+      { target: '[data-tour="workspace-header"]', title: 'Refresh Portfolio View', body: 'Start by refreshing assets to load the latest portfolio context.' },
+      { target: '[data-tour="workspace-list"]', title: 'Choose an Asset', body: 'Select a property asset to inspect value, loan, and case linkage.' },
+      { target: '[data-tour="workspace-detail"]', title: 'Inspect Case Context', body: 'Review linked case/property context to understand asset risk and status.' },
+      { target: '[data-tour="workspace-actions"]', title: 'Use Summary Metrics', body: 'Use portfolio value, loan, and equity metrics to prioritize next operator actions.' },
+    ],
+  });
+  document.getElementById('workspace-tour').addEventListener('click', () => workspaceTour?.start());
+
   if (WorkspaceApi.tokenExists()) {
     setSessionStatus('Using active sign-in session from Universal Pilot CRM.', 'success');
+    workspaceTour?.autoPromptOnce();
     loadAssets();
   } else {
     signedOutState();

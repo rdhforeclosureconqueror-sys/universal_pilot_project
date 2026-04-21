@@ -18,7 +18,7 @@
 </head>
 <body>
   <header>
-    <h1>Partner Routing Workspace</h1>
+    <h1 data-tour="workspace-header">Partner Routing Workspace</h1>
     <p>Routing queue → case context → partner selection and referral submission.</p>
   </header>
 
@@ -26,24 +26,25 @@
     <div id="session-status" class="status-banner"></div>
     <div class="helper-row">
       <button class="primary" id="load-cases">Refresh Routing Queue</button>
+      <button class="ghost" id="workspace-tour">Take Workspace Tour</button>
       <a href="/#/admin-command-center">Back to Command Center</a>
     </div>
   </section>
 
   <section class="layout">
-    <article class="card">
+    <article class="card" data-tour="workspace-list">
       <h3>Cases Needing Routing</h3>
       <div id="case-list"></div>
     </article>
 
-    <article class="card">
+    <article class="card" data-tour="workspace-detail">
       <h3>Case Routing Context</h3>
       <div id="case-detail">Select a case to view routing context.</div>
       <h4>Routing Status History</h4>
       <ul id="routing-history"></ul>
     </article>
 
-    <article class="card">
+    <article class="card" data-tour="workspace-actions">
       <h3>Route to Partner</h3>
       <form id="route-form">
         <label class="field"><span>Partner selection</span><select name="partner_organization_id" id="partner-select"></select></label>
@@ -191,8 +192,21 @@
     if (active) await selectCase(selectedCaseId, active);
   });
 
+  const workspaceTour = WorkspaceApi.createWorkspaceTour({
+    workspaceKey: 'partner-routing',
+    title: 'Partner Routing Workspace Tour',
+    steps: [
+      { target: '[data-tour="workspace-header"]', title: 'Open Routing Queue', body: 'Refresh to load cases that require partner routing decisions.' },
+      { target: '[data-tour="workspace-list"]', title: 'Select a Case Needing Routing', body: 'Choose a case card to load property context and routing options.' },
+      { target: '[data-tour="workspace-detail"]', title: 'Review Routing Context', body: 'Verify case details and routing history before submission.' },
+      { target: '[data-tour="workspace-actions"]', title: 'Submit Referral Routing', body: 'Pick a partner/category and submit routing so the case advances to partner intake.' },
+    ],
+  });
+  document.getElementById('workspace-tour').addEventListener('click', () => workspaceTour?.start());
+
   if (WorkspaceApi.tokenExists()) {
     setSessionStatus('Using active sign-in session from Universal Pilot CRM.', 'success');
+    workspaceTour?.autoPromptOnce();
     loadCases();
   } else {
     signedOutState();
