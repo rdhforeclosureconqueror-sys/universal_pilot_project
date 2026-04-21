@@ -145,6 +145,39 @@
   </section>
 
   <section class="page" data-page="cases" data-tour="cases-workspace">
+          <div class="card" data-tour="cases-create-panel">
+            <div class="helper-row">
+              <h3>Create New Case</h3>
+              <button type="button" class="ghost" id="cases-tour-replay">Take Workspace Tour</button>
+            </div>
+            <p class="hint">Start a case from scratch, then hand off directly into the matching workspace.</p>
+            <form id="case-create-form">
+              <div class="grid two">
+                <label class="field">
+                  <span>Program Key</span>
+                  <input type="text" name="program_key" placeholder="foreclosure_housing" required />
+                </label>
+                <label class="field">
+                  <span>Created By (User ID)</span>
+                  <input type="text" name="created_by" placeholder="Auto-filled from /auth/me when available" required />
+                </label>
+              </div>
+              <label class="field">
+                <span>Meta JSON (optional)</span>
+                <textarea name="meta" rows="3" placeholder='{"source":"operator_intake"}'></textarea>
+              </label>
+              <button type="submit" class="primary" id="case-create-submit">Create New Case</button>
+            </form>
+            <div class="detail-stack" id="case-create-result"></div>
+            <div class="quick-links hidden" id="case-handoff-links">
+              <a id="handoff-foreclosure" href="/admin/workspaces/foreclosure">Open Foreclosure Workspace</a>
+              <a id="handoff-essential-worker" href="/admin/workspaces/essential-worker">Open Essential Worker Workspace</a>
+              <a id="handoff-veteran" href="/admin/workspaces/veteran">Open Veteran Workspace</a>
+              <a href="/admin/workspaces/skiptrace">Open Skiptrace Workspace</a>
+              <a href="/admin/workspaces/partner-routing">Open Partner Routing Workspace</a>
+              <a href="/admin/workspaces/portfolio">Open Portfolio Workspace</a>
+            </div>
+          </div>
           <div class="grid two">
             <div class="card" data-tour="cases-filter-panel">
               <h3>Case Filters</h3>

@@ -19,7 +19,7 @@
 </head>
 <body>
   <header>
-    <h1>Skiptrace Workspace</h1>
+    <h1 data-tour="workspace-header">Skiptrace Workspace</h1>
     <p>Search queue → review contact confidence → run/retry/confirm skiptrace.</p>
   </header>
 
@@ -28,17 +28,18 @@
     <div class="helper-row">
       <input id="search-input" type="text" placeholder="Search by address, state, owner, or case id" />
       <button class="primary" id="load-cases">Refresh Queue</button>
+      <button class="ghost" id="workspace-tour">Take Workspace Tour</button>
       <a href="/#/admin-command-center">Back to Command Center</a>
     </div>
   </section>
 
   <section class="layout">
-    <article class="card">
+    <article class="card" data-tour="workspace-list">
       <h3>Skiptrace Queue</h3>
       <div id="case-list"></div>
     </article>
 
-    <article class="card">
+    <article class="card" data-tour="workspace-detail">
       <h3>Case Detail + Results</h3>
       <div id="case-detail">Select a case to review property and skiptrace results.</div>
       <h4>Contact Results</h4>
@@ -47,7 +48,7 @@
       <ul id="history-list"></ul>
     </article>
 
-    <article class="card">
+    <article class="card" data-tour="workspace-actions">
       <h3>Actions</h3>
       <label class="field"><span>Provider</span>
         <select id="provider">
@@ -223,8 +224,21 @@
     runAction('/actions/confirm', formData, (p) => `Confirmed contact for ${p.confirmed_contact?.owner_name || 'case'}.`);
   });
 
+  const workspaceTour = WorkspaceApi.createWorkspaceTour({
+    workspaceKey: 'skiptrace',
+    title: 'Skiptrace Workspace Tour',
+    steps: [
+      { target: '[data-tour="workspace-header"]', title: 'Load and Search Queue', body: 'Refresh or search to focus on the cases needing contact resolution.' },
+      { target: '[data-tour="workspace-list"]', title: 'Select a Case', body: 'Pick a queue item to open property context and owner hints.' },
+      { target: '[data-tour="workspace-detail"]', title: 'Review Results and History', body: 'Check returned contact confidence and prior lookup history before confirming.' },
+      { target: '[data-tour="workspace-actions"]', title: 'Run, Retry, Confirm', body: 'Run or retry skiptrace, then confirm the best contact record to move the case ahead.' },
+    ],
+  });
+  document.getElementById('workspace-tour').addEventListener('click', () => workspaceTour?.start());
+
   if (WorkspaceApi.tokenExists()) {
     setSessionStatus('Using active sign-in session from Universal Pilot CRM.', 'success');
+    workspaceTour?.autoPromptOnce();
     loadCases();
   } else {
     signedOutState();

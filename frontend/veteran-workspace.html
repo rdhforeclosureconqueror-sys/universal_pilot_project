@@ -20,7 +20,7 @@
 </head>
 <body>
   <header>
-    <h1>Veteran Workspace</h1>
+    <h1 data-tour="workspace-header">Veteran Workspace</h1>
     <p>List → detail → actions workflow for active veteran intelligence cases.</p>
   </header>
 
@@ -28,18 +28,19 @@
     <div id="session-status" class="status-banner"></div>
     <div class="helper-row">
       <button class="primary" id="load-cases">Refresh Veteran Cases</button>
+      <button class="ghost" id="workspace-tour">Take Workspace Tour</button>
       <a href="/#/admin-command-center">Back to Command Center</a>
     </div>
   </section>
 
   <section class="layout">
-    <article class="card">
+    <article class="card" data-tour="workspace-list">
       <h3>Case List</h3>
       <p class="hint">Click a case card to open details and run actions.</p>
       <div id="case-list"></div>
     </article>
 
-    <article class="card">
+    <article class="card" data-tour="workspace-detail">
       <h3>Case Detail</h3>
       <div id="case-detail">Select a case to view veteran profile, benefits progress, and risk snapshot.</div>
       <h4>Program / Benefit visibility</h4>
@@ -48,7 +49,7 @@
       <ul id="audit"></ul>
     </article>
 
-    <article class="card">
+    <article class="card" data-tour="workspace-actions">
       <h3>Actions</h3>
       <button class="primary" id="discover-benefits">Discover Benefits</button>
       <button class="ghost" id="generate-plan">Generate Plan</button>
@@ -209,8 +210,21 @@
     setActionFeedback(`Plan generated. Next steps: ${(payload.steps || []).join(' | ') || '—'}`, 'success');
   });
 
+  const workspaceTour = WorkspaceApi.createWorkspaceTour({
+    workspaceKey: 'veteran',
+    title: 'Veteran Workspace Tour',
+    steps: [
+      { target: '[data-tour="workspace-header"]', title: 'Open Veteran Queue', body: 'Refresh the queue to pull active veteran intelligence cases.' },
+      { target: '[data-tour="workspace-list"]', title: 'Choose a Veteran Case', body: 'Select a case card to load profile, risk, and benefit context.' },
+      { target: '[data-tour="workspace-detail"]', title: 'Confirm Benefit Context', body: 'Review current benefit progress and compliance audit history.' },
+      { target: '[data-tour="workspace-actions"]', title: 'Discover and Advance', body: 'Run Discover Benefits and then Generate Plan to move the case forward.' },
+    ],
+  });
+  document.getElementById('workspace-tour').addEventListener('click', () => workspaceTour?.start());
+
   if (WorkspaceApi.tokenExists()) {
     setSessionStatus('Using active sign-in session from Universal Pilot CRM.', 'success');
+    workspaceTour?.autoPromptOnce();
     loadCases();
   } else {
     signedOutState();

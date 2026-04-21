@@ -23,7 +23,7 @@
 </head>
 <body>
   <header>
-    <h1>Foreclosure Workspace</h1>
+    <h1 data-tour="workspace-header">Foreclosure Workspace</h1>
     <p>List → detail → actions workflow for active foreclosure cases.</p>
   </header>
 
@@ -31,25 +31,26 @@
     <div id="session-status" class="status-banner"></div>
     <div class="helper-row">
       <button class="primary" id="load-cases">Refresh Foreclosure Cases</button>
+      <button class="ghost" id="workspace-tour">Take Workspace Tour</button>
       <a href="/#/admin-command-center">Back to Command Center</a>
     </div>
   </section>
 
   <section class="layout">
-    <article class="card">
+    <article class="card" data-tour="workspace-list">
       <h3>Case List</h3>
       <p class="hint">Click a case card to open details and run actions.</p>
       <div id="case-list"></div>
     </article>
 
-    <article class="card">
+    <article class="card" data-tour="workspace-detail">
       <h3>Case Detail</h3>
       <div id="case-detail">Select a case to view property info, stage, and financial snapshot.</div>
       <h4>Audit / Compliance</h4>
       <ul id="audit"></ul>
     </article>
 
-    <article class="card">
+    <article class="card" data-tour="workspace-actions">
       <h3>Actions</h3>
       <form id="analyze-form">
         <label class="field"><span>Estimated value</span><input name="estimated_property_value" type="number" step="0.01" required /></label>
@@ -255,8 +256,21 @@
     if (activeItem) await selectCase(selectedCaseId, activeItem);
   });
 
+  const workspaceTour = WorkspaceApi.createWorkspaceTour({
+    workspaceKey: 'foreclosure',
+    title: 'Foreclosure Workspace Tour',
+    steps: [
+      { target: '[data-tour="workspace-header"]', title: 'Open the Queue', body: 'Start here, then refresh foreclosure cases to load your active queue.' },
+      { target: '[data-tour="workspace-list"]', title: 'Pick the Highest Urgency Case', body: 'Select a case card to open context before taking action.' },
+      { target: '[data-tour="workspace-detail"]', title: 'Review Financial Risk', body: 'Confirm stage, balance, arrears, and audit context before proceeding.' },
+      { target: '[data-tour="workspace-actions"]', title: 'Run Analysis and Advance Step', body: 'Run Analyze Property, then Trigger Next Step to move the case forward.' },
+    ],
+  });
+  document.getElementById('workspace-tour').addEventListener('click', () => workspaceTour?.start());
+
   if (WorkspaceApi.tokenExists()) {
     setSessionStatus('Using active sign-in session from Universal Pilot CRM.', 'success');
+    workspaceTour?.autoPromptOnce();
     loadCases();
   } else {
     signedOutState();
