@@ -37,6 +37,7 @@ from api.routes import (
     pipeline,
     verify,
     essential_worker,
+    veteran,
     lead_intelligence,
     mufasa_ai,
     system_verify,
@@ -78,9 +79,29 @@ def foreclosure_help_page():
     return FileResponse(frontend_dir / "foreclosure-help.html")
 
 
+@app.get("/help/essential-worker")
+def essential_worker_help_page():
+    return FileResponse(frontend_dir / "essential-worker-help.html")
+
+
+@app.get("/help/veteran")
+def veteran_help_page():
+    return FileResponse(frontend_dir / "veteran-help.html")
+
+
 @app.get("/admin/workspaces/foreclosure")
 def foreclosure_workspace_page():
     return FileResponse(frontend_dir / "foreclosure-workspace.html")
+
+
+@app.get("/admin/workspaces/essential-worker")
+def essential_worker_workspace_page():
+    return FileResponse(frontend_dir / "essential-worker-workspace.html")
+
+
+@app.get("/admin/workspaces/veteran")
+def veteran_workspace_page():
+    return FileResponse(frontend_dir / "veteran-workspace.html")
 
 
 @app.get("/styles.css")
@@ -126,6 +147,7 @@ app.include_router(membership.router)
 app.include_router(pipeline.router)
 app.include_router(verify.router)
 app.include_router(essential_worker.router)
+app.include_router(veteran.router)
 app.include_router(lead_intelligence.router)
 app.include_router(mufasa_ai.router)
 app.include_router(system_verify.router)

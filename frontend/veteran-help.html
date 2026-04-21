@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Veteran Benefits & Housing Intake</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <style>
+    .container { max-width: 840px; margin: 0 auto; }
+    .steps { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+    .step { padding: 6px 10px; border-radius: 999px; border: 1px solid #cbd2d9; font-size: 12px; }
+    .step.active { background: #1f7aec; color: #fff; border-color: #1f7aec; }
+    .actions { display: flex; gap: 12px; justify-content: space-between; }
+    .trust { background: #f0f4f8; border: 1px solid #d9e2ec; border-radius: 10px; padding: 10px; margin-bottom: 12px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Veteran housing & benefits help</h1>
+      <p>Share your service and housing profile so our team can match you to benefits and immediate support options.</p>
+    </header>
+
+    <section class="card trust">
+      <strong>Trust & compliance</strong>
+      <p>We use your information only for veteran benefit eligibility and housing triage. Submission requires your consent.</p>
+    </section>
+
+    <section class="card">
+      <div class="steps" id="steps"></div>
+      <form id="intake-form">
+        <div data-step="0">
+          <h3>1) Service profile</h3>
+          <label class="field"><span>Branch of service</span><input name="branch_of_service" /></label>
+          <label class="field"><span>Years of service</span><input name="years_of_service" type="number" /></label>
+          <label class="field"><span>Discharge status</span><input name="discharge_status" placeholder="honorable, general, medical retirement" /></label>
+          <label class="field"><span>Disability rating (%)</span><input name="disability_rating" type="number" min="0" max="100" /></label>
+        </div>
+
+        <div data-step="1" class="hidden">
+          <h3>2) Housing context</h3>
+          <label class="field"><span>State of residence</span><input name="state_of_residence" required maxlength="2" /></label>
+          <label class="field"><span>Mortgage status</span><input name="mortgage_status" placeholder="active_va_loan, delinquent, none" /></label>
+          <label class="field"><span>Income level</span>
+            <select name="income_level">
+              <option value="">Select one</option>
+              <option value="low">Low</option>
+              <option value="very_low">Very low</option>
+              <option value="moderate">Moderate</option>
+            </select>
+          </label>
+          <label class="field"><span><input name="homeowner_status" type="checkbox" /> I currently own my home</span></label>
+          <label class="field"><span><input name="foreclosure_risk" type="checkbox" /> I am at risk of foreclosure</span></label>
+        </div>
+
+        <div data-step="2" class="hidden">
+          <h3>3) Household context</h3>
+          <label class="field"><span><input name="combat_service" type="checkbox" /> Combat service</span></label>
+          <label class="field"><span><input name="dependent_status" type="checkbox" /> Dependents in household</span></label>
+          <label class="field"><span><input name="permanent_and_total_status" type="checkbox" /> Permanent and total disability status</span></label>
+        </div>
+
+        <div data-step="3" class="hidden">
+          <h3>4) Contact info</h3>
+          <label class="field"><span>Full name</span><input name="full_name" required /></label>
+          <label class="field"><span>Email</span><input name="contact_email" type="email" required /></label>
+          <label class="field"><span>Phone</span><input name="phone" required /></label>
+        </div>
+
+        <div data-step="4" class="hidden">
+          <h3>5) Consent</h3>
+          <label class="field">
+            <span><input name="consent_acknowledged" type="checkbox" required /> I consent to use of my data for veteran benefits and housing support follow-up.</span>
+          </label>
+        </div>
+
+        <div class="actions">
+          <button type="button" id="prev" class="ghost">Back</button>
+          <button type="button" id="next" class="primary">Next</button>
+          <button type="submit" id="submit" class="primary hidden">Submit Intake</button>
+        </div>
+      </form>
+      <div class="response" id="response"></div>
+    </section>
+
+    <section class="card hidden" id="confirmation">
+      <h3>Submission received</h3>
+      <p><strong>Case ID:</strong> <span id="confirmation-case-id">—</span></p>
+      <p id="confirmation-message"></p>
+      <p><strong>Thank you for your service.</strong> Your intake is now in our veteran specialist queue.</p>
+      <ul>
+        <li>Step 1: We review your service and housing profile.</li>
+        <li>Step 2: We discover and prioritize eligible veteran benefits.</li>
+        <li>Step 3: We contact you with a guided action plan and document checklist.</li>
+      </ul>
+    </section>
+  </div>
+
+<script>
+  const steps = ["Service", "Housing", "Household", "Contact", "Consent"];
+  let currentStep = 0;
+  const form = document.getElementById('intake-form');
+  const responseEl = document.getElementById('response');
+
+  function renderSteps() {
+    const wrapper = document.getElementById('steps');
+    wrapper.innerHTML = '';
+    steps.forEach((name, idx) => {
+      const el = document.createElement('span');
+      el.className = `step ${idx === currentStep ? 'active' : ''}`;
+      el.textContent = `${idx + 1}. ${name}`;
+      wrapper.appendChild(el);
+      document.querySelector(`[data-step="${idx}"]`).classList.toggle('hidden', idx !== currentStep);
+    });
+    document.getElementById('prev').disabled = currentStep === 0;
+    document.getElementById('next').classList.toggle('hidden', currentStep === steps.length - 1);
+    document.getElementById('submit').classList.toggle('hidden', currentStep !== steps.length - 1);
+  }
+
+  document.getElementById('prev').addEventListener('click', () => { currentStep = Math.max(0, currentStep - 1); renderSteps(); });
+  document.getElementById('next').addEventListener('click', () => { currentStep = Math.min(steps.length - 1, currentStep + 1); renderSteps(); });
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const data = Object.fromEntries(new FormData(form).entries());
+    data.consent_acknowledged = Boolean(form.consent_acknowledged.checked);
+    data.homeowner_status = Boolean(form.homeowner_status.checked);
+    data.foreclosure_risk = Boolean(form.foreclosure_risk.checked);
+    data.combat_service = Boolean(form.combat_service.checked);
+    data.dependent_status = Boolean(form.dependent_status.checked);
+    data.permanent_and_total_status = Boolean(form.permanent_and_total_status.checked);
+    ['years_of_service', 'disability_rating'].forEach((f) => {
+      if (data[f] !== '') data[f] = Number(data[f]); else delete data[f];
+    });
+
+    const response = await fetch('/veteran/intake/public', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    const payload = await response.json();
+    responseEl.textContent = payload.message || 'Unable to submit intake.';
+    if (response.ok) {
+      document.getElementById('confirmation').classList.remove('hidden');
+      document.getElementById('confirmation-case-id').textContent = payload.case_id || '—';
+      document.getElementById('confirmation-message').textContent = `Case ${payload.case_id} was created successfully. Expect outreach within 1 business day.`;
+    }
+  });
+
+  renderSteps();
+</script>
+</body>
+</html>

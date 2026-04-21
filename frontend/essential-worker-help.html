@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Essential Worker Housing Intake</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <style>
+    .container { max-width: 840px; margin: 0 auto; }
+    .steps { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+    .step { padding: 6px 10px; border-radius: 999px; border: 1px solid #cbd2d9; font-size: 12px; }
+    .step.active { background: #1f7aec; color: #fff; border-color: #1f7aec; }
+    .actions { display: flex; gap: 12px; justify-content: space-between; }
+    .trust { background: #f0f4f8; border: 1px solid #d9e2ec; border-radius: 10px; padding: 10px; margin-bottom: 12px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Essential worker housing help</h1>
+      <p>Housing costs are rising. Share your profile so we can route you to programs that match your profession and location.</p>
+    </header>
+
+    <section class="card trust">
+      <strong>Trust & compliance</strong>
+      <p>We use your data only for essential worker housing support and program eligibility review. Submission requires your consent.</p>
+    </section>
+
+    <section class="card">
+      <div class="steps" id="steps"></div>
+      <form id="intake-form">
+        <div data-step="0">
+          <h3>1) Work profile</h3>
+          <label class="field"><span>Profession</span><input name="profession" required placeholder="Teacher, Nurse, EMT, Police" /></label>
+          <label class="field"><span>Employer type</span><input name="employer_type" placeholder="Public school, hospital, city agency" /></label>
+          <label class="field"><span>First-time homebuyer status</span>
+            <select name="first_time_homebuyer">
+              <option value="">Select one</option>
+              <option value="yes">Yes</option>
+              <option value="no">No</option>
+              <option value="unsure">Unsure</option>
+            </select>
+          </label>
+        </div>
+
+        <div data-step="1" class="hidden">
+          <h3>2) Location + income</h3>
+          <label class="field"><span>City</span><input name="city" /></label>
+          <label class="field"><span>State</span><input name="state" required maxlength="2" /></label>
+          <label class="field"><span>Annual income</span><input name="annual_income" type="number" step="0.01" /></label>
+        </div>
+
+        <div data-step="2" class="hidden">
+          <h3>3) Contact info</h3>
+          <label class="field"><span>Full name</span><input name="full_name" required /></label>
+          <label class="field"><span>Email</span><input name="contact_email" type="email" required /></label>
+          <label class="field"><span>Phone</span><input name="phone" required /></label>
+        </div>
+
+        <div data-step="3" class="hidden">
+          <h3>4) Consent</h3>
+          <label class="field">
+            <span><input name="consent_acknowledged" type="checkbox" required /> I consent to use of my data for essential worker housing program matching and follow-up contact.</span>
+          </label>
+        </div>
+
+        <div class="actions">
+          <button type="button" id="prev" class="ghost">Back</button>
+          <button type="button" id="next" class="primary">Next</button>
+          <button type="submit" id="submit" class="primary hidden">Submit Intake</button>
+        </div>
+      </form>
+      <div class="response" id="response"></div>
+    </section>
+
+    <section class="card hidden" id="confirmation">
+      <h3>Submission received</h3>
+      <p><strong>Case ID:</strong> <span id="confirmation-case-id">—</span></p>
+      <p id="confirmation-message"></p>
+      <p><strong>You are not navigating this alone.</strong> Your intake has been queued for operator review.</p>
+      <ul>
+        <li>Step 1: We validate your profession and location profile.</li>
+        <li>Step 2: We discover eligible essential worker housing programs.</li>
+        <li>Step 3: We contact you with next steps and required documents.</li>
+      </ul>
+    </section>
+  </div>
+
+<script>
+  const steps = ["Work", "Location", "Contact", "Consent"];
+  let currentStep = 0;
+  const form = document.getElementById('intake-form');
+  const responseEl = document.getElementById('response');
+
+  function renderSteps() {
+    const wrapper = document.getElementById('steps');
+    wrapper.innerHTML = '';
+    steps.forEach((name, idx) => {
+      const el = document.createElement('span');
+      el.className = `step ${idx === currentStep ? 'active' : ''}`;
+      el.textContent = `${idx + 1}. ${name}`;
+      wrapper.appendChild(el);
+      document.querySelector(`[data-step="${idx}"]`).classList.toggle('hidden', idx !== currentStep);
+    });
+    document.getElementById('prev').disabled = currentStep === 0;
+    document.getElementById('next').classList.toggle('hidden', currentStep === steps.length - 1);
+    document.getElementById('submit').classList.toggle('hidden', currentStep !== steps.length - 1);
+  }
+
+  document.getElementById('prev').addEventListener('click', () => { currentStep = Math.max(0, currentStep - 1); renderSteps(); });
+  document.getElementById('next').addEventListener('click', () => { currentStep = Math.min(steps.length - 1, currentStep + 1); renderSteps(); });
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const data = Object.fromEntries(new FormData(form).entries());
+    data.consent_acknowledged = Boolean(form.consent_acknowledged.checked);
+    if (data.annual_income !== '') data.annual_income = Number(data.annual_income); else delete data.annual_income;
+
+    const response = await fetch('/essential-worker/intake/public', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    const payload = await response.json();
+    responseEl.textContent = payload.message || 'Unable to submit intake.';
+    if (response.ok) {
+      document.getElementById('confirmation').classList.remove('hidden');
+      document.getElementById('confirmation-case-id').textContent = payload.case_id || '—';
+      document.getElementById('confirmation-message').textContent = `Case ${payload.case_id} was created successfully. Expect outreach within 1 business day.`;
+    }
+  });
+
+  renderSteps();
+</script>
+</body>
+</html>
