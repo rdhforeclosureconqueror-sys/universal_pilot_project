@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Partner Routing Workspace</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <style>
+    .layout { display: grid; grid-template-columns: 320px 1fr 320px; gap: 16px; }
+    .list-item { padding: 10px; border: 1px solid #d9e2ec; border-radius: 10px; margin-bottom: 8px; cursor: pointer; }
+    .list-item.active { border-color: #1f7aec; background: #f0f7ff; }
+    .status-banner { margin-bottom: 12px; padding: 10px; border-radius: 8px; border: 1px solid #d9e2ec; background: #f8fafc; }
+    .status-banner.warning { background: #fff8e1; border-color: #ffecb3; }
+    .status-banner.success { background: #edf7ed; border-color: #c8e6c9; }
+    .status-banner.error { background: #fdecea; border-color: #f5c2c7; }
+    .helper-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 10px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Partner Routing Workspace</h1>
+    <p>Routing queue → case context → partner selection and referral submission.</p>
+  </header>
+
+  <section class="card">
+    <div id="session-status" class="status-banner"></div>
+    <div class="helper-row">
+      <button class="primary" id="load-cases">Refresh Routing Queue</button>
+      <a href="/#/admin-command-center">Back to Command Center</a>
+    </div>
+  </section>
+
+  <section class="layout">
+    <article class="card">
+      <h3>Cases Needing Routing</h3>
+      <div id="case-list"></div>
+    </article>
+
+    <article class="card">
+      <h3>Case Routing Context</h3>
+      <div id="case-detail">Select a case to view routing context.</div>
+      <h4>Routing Status History</h4>
+      <ul id="routing-history"></ul>
+    </article>
+
+    <article class="card">
+      <h3>Route to Partner</h3>
+      <form id="route-form">
+        <label class="field"><span>Partner selection</span><select name="partner_organization_id" id="partner-select"></select></label>
+        <label class="field"><span>State</span><input name="state" required /></label>
+        <label class="field"><span>Routing category</span>
+          <select name="routing_category" required>
+            <option value="legal_defense">Legal defense</option>
+            <option value="loan_modification">Loan modification</option>
+            <option value="nonprofit_support">Nonprofit support</option>
+            <option value="property_acquisition">Property acquisition</option>
+          </select>
+        </label>
+        <label class="field"><span>Routing reason</span><textarea name="routing_reason" placeholder="Add context for partner intake"></textarea></label>
+        <button class="primary" type="submit">Submit Routing</button>
+      </form>
+      <div class="response" id="action-response"></div>
+    </article>
+  </section>
+
+<script src="/workspace-api.js"></script>
+<script>
+  let selectedCaseId = null;
+  const listEl = document.getElementById('case-list');
+  const sessionStatusEl = document.getElementById('session-status');
+  const actionResponseEl = document.getElementById('action-response');
+
+  function setSessionStatus(message, kind = '') {
+    sessionStatusEl.textContent = message;
+    sessionStatusEl.className = `status-banner ${kind}`.trim();
+  }
+
+  function setActionFeedback(message, kind = '') {
+    actionResponseEl.textContent = message;
+    actionResponseEl.className = `response ${kind}`.trim();
+  }
+
+  function signedOutState() {
+    setSessionStatus('');
+    sessionStatusEl.innerHTML = 'You are not signed in. <a href="/#/login">Sign in</a> to continue.';
+    sessionStatusEl.className = 'status-banner warning';
+  }
+
+  async function loadCases() {
+    setSessionStatus('Loading partner routing queue...', 'warning');
+    const response = await WorkspaceApi.apiFetch('/partners/workspace/cases');
+    const payload = await response.json();
+    listEl.innerHTML = '';
+
+    if (!response.ok) {
+      setSessionStatus(payload.detail || 'Unable to load routing queue.', 'error');
+      return;
+    }
+
+    if (!payload.length) {
+      setSessionStatus('Connected. No cases currently awaiting routing.', 'success');
+      listEl.innerHTML = '<p class="hint">All current cases have already been routed.</p>';
+      return;
+    }
+
+    payload.forEach((row) => {
+      const item = document.createElement('div');
+      item.className = 'list-item';
+      item.dataset.caseId = row.case_id;
+      item.innerHTML = `<strong>${row.property_address || 'Unknown property'}</strong><br/><small>${row.city || ''}, ${row.state || ''}</small><br/><small>Stage: ${row.foreclosure_stage || '—'}</small>`;
+      item.addEventListener('click', () => selectCase(row.case_id, item));
+      listEl.appendChild(item);
+    });
+
+    setSessionStatus('Connected. Routing queue loaded.', 'success');
+  }
+
+  async function selectCase(caseId, itemEl) {
+    selectedCaseId = caseId;
+    document.querySelectorAll('.list-item').forEach((el) => el.classList.remove('active'));
+    itemEl.classList.add('active');
+
+    setActionFeedback('Loading routing context...', 'warning');
+    const response = await WorkspaceApi.apiFetch(`/partners/workspace/cases/${caseId}`);
+    const payload = await response.json();
+    if (!response.ok) {
+      setActionFeedback(payload.detail || 'Unable to load case detail.', 'error');
+      return;
+    }
+
+    const c = payload.case || {};
+    document.getElementById('case-detail').innerHTML = `
+      <strong>Case ID:</strong> ${c.case_id}<br/>
+      <strong>Property:</strong> ${c.property_address || '—'}, ${c.city || '—'}, ${c.state || '—'}<br/>
+      <strong>Foreclosure stage:</strong> ${c.foreclosure_stage || '—'}<br/>
+      <strong>Estimated value:</strong> ${c.estimated_property_value ?? '—'}<br/>
+      <strong>Loan balance:</strong> ${c.loan_balance ?? '—'}<br/>
+      <strong>Arrears:</strong> ${c.arrears_amount ?? '—'}
+    `;
+
+    const partnerSelect = document.getElementById('partner-select');
+    partnerSelect.innerHTML = '<option value="">Auto-select by category/state</option>';
+    (payload.partner_options || []).forEach((partner) => {
+      const option = document.createElement('option');
+      option.value = partner.partner_organization_id;
+      option.textContent = `${partner.name} — ${partner.service_type} (${partner.service_region || 'multi-state'})`;
+      partnerSelect.appendChild(option);
+    });
+
+    const form = document.getElementById('route-form');
+    form.elements.state.value = c.state || '';
+
+    const historyEl = document.getElementById('routing-history');
+    historyEl.innerHTML = '';
+    (payload.referral_history || []).forEach((entry) => {
+      const li = document.createElement('li');
+      li.textContent = `${entry.created_at || '—'} — ${entry.partner_name} (${entry.routing_category}) → ${entry.status}`;
+      historyEl.appendChild(li);
+    });
+
+    setActionFeedback('Routing context loaded. Select partner and submit referral.', 'success');
+  }
+
+  document.getElementById('load-cases').addEventListener('click', loadCases);
+
+  document.getElementById('route-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!selectedCaseId) {
+      setActionFeedback('Select a case before submitting routing.', 'warning');
+      return;
+    }
+    const data = Object.fromEntries(new FormData(e.target).entries());
+    if (!data.partner_organization_id) {
+      delete data.partner_organization_id;
+    }
+
+    setActionFeedback('Submitting partner routing...', 'warning');
+    const response = await WorkspaceApi.apiFetch(`/partners/workspace/cases/${selectedCaseId}/actions/route`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    const payload = await response.json();
+    if (!response.ok) {
+      setActionFeedback(payload.detail || 'Routing request failed.', 'error');
+      return;
+    }
+
+    setActionFeedback(`Routing submitted successfully. Referral ${payload.partner_referral_id} is ${payload.status}.`, 'success');
+    await loadCases();
+    const active = document.querySelector(`.list-item[data-case-id="${selectedCaseId}"]`);
+    if (active) await selectCase(selectedCaseId, active);
+  });
+
+  if (WorkspaceApi.tokenExists()) {
+    setSessionStatus('Using active sign-in session from Universal Pilot CRM.', 'success');
+    loadCases();
+  } else {
+    signedOutState();
+  }
+</script>
+</body>
+</html>

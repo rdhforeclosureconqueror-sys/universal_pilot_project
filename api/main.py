@@ -41,6 +41,7 @@ from api.routes import (
     lead_intelligence,
     mufasa_ai,
     system_verify,
+    skiptrace,
 )
 
 # -----------------------------------------------------
@@ -104,6 +105,21 @@ def veteran_workspace_page():
     return FileResponse(frontend_dir / "veteran-workspace.html")
 
 
+@app.get("/admin/workspaces/skiptrace")
+def skiptrace_workspace_page():
+    return FileResponse(frontend_dir / "skiptrace-workspace.html")
+
+
+@app.get("/admin/workspaces/partner-routing")
+def partner_routing_workspace_page():
+    return FileResponse(frontend_dir / "partner-routing-workspace.html")
+
+
+@app.get("/admin/workspaces/portfolio")
+def portfolio_workspace_page():
+    return FileResponse(frontend_dir / "portfolio-workspace.html")
+
+
 @app.get("/styles.css")
 def read_styles():
     return FileResponse(frontend_dir / "styles.css")
@@ -112,6 +128,11 @@ def read_styles():
 @app.get("/app.js")
 def read_app_js():
     return FileResponse(frontend_dir / "app.js")
+
+
+@app.get("/workspace-api.js")
+def read_workspace_api_js():
+    return FileResponse(frontend_dir / "workspace-api.js")
 
 
 @app.get("/config.js")
@@ -151,6 +172,7 @@ app.include_router(veteran.router)
 app.include_router(lead_intelligence.router)
 app.include_router(mufasa_ai.router)
 app.include_router(system_verify.router)
+app.include_router(skiptrace.router)
 
 app.include_router(public_apply.router)
 app.include_router(system_admin.router)

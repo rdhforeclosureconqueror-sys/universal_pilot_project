@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Portfolio Workspace</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <style>
+    .layout { display: grid; grid-template-columns: 320px 1fr 320px; gap: 16px; }
+    .list-item { padding: 10px; border: 1px solid #d9e2ec; border-radius: 10px; margin-bottom: 8px; cursor: pointer; }
+    .list-item.active { border-color: #1f7aec; background: #f0f7ff; }
+    .status-banner { margin-bottom: 12px; padding: 10px; border-radius: 8px; border: 1px solid #d9e2ec; background: #f8fafc; }
+    .status-banner.warning { background: #fff8e1; border-color: #ffecb3; }
+    .status-banner.success { background: #edf7ed; border-color: #c8e6c9; }
+    .status-banner.error { background: #fdecea; border-color: #f5c2c7; }
+    .helper-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 10px; }
+    .metric-card { border: 1px solid #d9e2ec; border-radius: 10px; padding: 10px; margin-bottom: 8px; background: #f8fbff; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Portfolio Workspace</h1>
+    <p>Portfolio asset list → selected property detail → value, loans, equity summary.</p>
+  </header>
+
+  <section class="card">
+    <div id="session-status" class="status-banner"></div>
+    <div class="helper-row">
+      <button class="primary" id="load-assets">Refresh Portfolio</button>
+      <a href="/#/admin-command-center">Back to Command Center</a>
+    </div>
+  </section>
+
+  <section class="layout">
+    <article class="card">
+      <h3>Portfolio Assets</h3>
+      <div id="asset-list"></div>
+    </article>
+
+    <article class="card">
+      <h3>Asset Detail</h3>
+      <div id="asset-detail">Select an asset to view portfolio context.</div>
+      <h4>Case / Property Context</h4>
+      <ul id="case-context"></ul>
+    </article>
+
+    <article class="card">
+      <h3>Portfolio Summary</h3>
+      <div id="summary-cards"></div>
+      <div class="response" id="action-response"></div>
+    </article>
+  </section>
+
+<script src="/workspace-api.js"></script>
+<script>
+  let selectedAssetId = null;
+  const listEl = document.getElementById('asset-list');
+  const sessionStatusEl = document.getElementById('session-status');
+  const actionResponseEl = document.getElementById('action-response');
+
+  function setSessionStatus(message, kind = '') {
+    sessionStatusEl.textContent = message;
+    sessionStatusEl.className = `status-banner ${kind}`.trim();
+  }
+
+  function setActionFeedback(message, kind = '') {
+    actionResponseEl.textContent = message;
+    actionResponseEl.className = `response ${kind}`.trim();
+  }
+
+  function signedOutState() {
+    setSessionStatus('');
+    sessionStatusEl.innerHTML = 'You are not signed in. <a href="/#/login">Sign in</a> to continue.';
+    sessionStatusEl.className = 'status-banner warning';
+  }
+
+  function renderSummary(summary) {
+    const cards = document.getElementById('summary-cards');
+    cards.innerHTML = '';
+    const entries = [
+      ['Portfolio Value', `$${summary.portfolio_value ?? 0}`],
+      ['Loans', `$${summary.portfolio_loans ?? 0}`],
+      ['Equity', `$${summary.portfolio_equity ?? 0}`],
+      ['Total Assets', `${summary.total_assets ?? 0}`],
+      ['Active Assets', `${summary.active_assets ?? 0}`],
+      ['Watchlist Assets', `${summary.watchlist_assets ?? 0}`],
+    ];
+    entries.forEach(([label, value]) => {
+      const card = document.createElement('div');
+      card.className = 'metric-card';
+      card.innerHTML = `<strong>${label}</strong><div>${value}</div>`;
+      cards.appendChild(card);
+    });
+  }
+
+  async function loadSummary() {
+    const response = await WorkspaceApi.apiFetch('/portfolio/workspace/summary');
+    const payload = await response.json();
+    if (!response.ok) {
+      setActionFeedback(payload.detail || 'Unable to load summary.', 'error');
+      return;
+    }
+    renderSummary(payload);
+  }
+
+  async function loadAssets() {
+    setSessionStatus('Loading portfolio assets...', 'warning');
+    const response = await WorkspaceApi.apiFetch('/portfolio/workspace/assets');
+    const payload = await response.json();
+    listEl.innerHTML = '';
+
+    if (!response.ok) {
+      setSessionStatus(payload.detail || 'Unable to load portfolio assets.', 'error');
+      return;
+    }
+
+    if (!payload.length) {
+      setSessionStatus('Connected. No assets in the portfolio yet.', 'success');
+      listEl.innerHTML = '<p class="hint">No properties currently in portfolio context.</p>';
+      await loadSummary();
+      return;
+    }
+
+    payload.forEach((row) => {
+      const item = document.createElement('div');
+      item.className = 'list-item';
+      item.dataset.assetId = row.property_asset_id;
+      item.innerHTML = `<strong>${row.property_address || 'Unknown asset'}</strong><br/><small>${row.city || ''}, ${row.state || ''}</small><br/><small>Equity est: $${row.equity_estimate ?? 0}</small>`;
+      item.addEventListener('click', () => selectAsset(row.property_asset_id, item));
+      listEl.appendChild(item);
+    });
+
+    setSessionStatus('Connected. Portfolio assets loaded.', 'success');
+    await loadSummary();
+  }
+
+  async function selectAsset(assetId, itemEl) {
+    selectedAssetId = assetId;
+    document.querySelectorAll('.list-item').forEach((el) => el.classList.remove('active'));
+    itemEl.classList.add('active');
+
+    setActionFeedback('Loading asset detail...', 'warning');
+    const response = await WorkspaceApi.apiFetch(`/portfolio/workspace/assets/${assetId}`);
+    const payload = await response.json();
+    if (!response.ok) {
+      setActionFeedback(payload.detail || 'Unable to load asset detail.', 'error');
+      return;
+    }
+
+    const a = payload.asset || {};
+    document.getElementById('asset-detail').innerHTML = `
+      <strong>Asset ID:</strong> ${a.property_asset_id}<br/>
+      <strong>Property:</strong> ${a.property_address || '—'}, ${a.city || '—'}, ${a.state || '—'}<br/>
+      <strong>Case Link:</strong> ${a.case_id || 'None'}<br/>
+      <strong>Status:</strong> ${a.portfolio_status || '—'}<br/>
+      <strong>Acquisition Cost:</strong> ${a.acquisition_cost ?? '—'}<br/>
+      <strong>Estimated Value:</strong> ${a.estimated_value ?? '—'}<br/>
+      <strong>Loan Amount:</strong> ${a.loan_amount ?? '—'}
+    `;
+
+    const contextEl = document.getElementById('case-context');
+    contextEl.innerHTML = '';
+    Object.entries(payload.case_context || {}).forEach(([k, v]) => {
+      const li = document.createElement('li');
+      li.textContent = `${k.replaceAll('_', ' ')}: ${v ?? '—'}`;
+      contextEl.appendChild(li);
+    });
+
+    renderSummary(payload.summary || {});
+    setActionFeedback('Asset detail loaded. Portfolio metrics refreshed.', 'success');
+  }
+
+  document.getElementById('load-assets').addEventListener('click', loadAssets);
+
+  if (WorkspaceApi.tokenExists()) {
+    setSessionStatus('Using active sign-in session from Universal Pilot CRM.', 'success');
+    loadAssets();
+  } else {
+    signedOutState();
+  }
+</script>
+</body>
+</html>
