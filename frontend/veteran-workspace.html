@@ -56,8 +56,8 @@
     </article>
   </section>
 
+<script src="/workspace-api.js"></script>
 <script>
-  const AUTH_TOKEN_KEY = 'auth_token';
   let selectedCaseId = null;
   const listEl = document.getElementById('case-list');
   const sessionStatusEl = document.getElementById('session-status');
@@ -73,18 +73,23 @@
     actionResponseEl.className = `response ${kind}`.trim();
   }
 
-  function authHeaders() {
-    const token = localStorage.getItem(AUTH_TOKEN_KEY) || '';
-    return { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) };
+  function signedOutState() {
+    setSessionStatus('');
+    sessionStatusEl.innerHTML = 'You are not signed in. <a href="/#/login">Sign in</a> to continue.';
+    sessionStatusEl.className = 'status-banner warning';
   }
 
   async function loadCases() {
     setSessionStatus('Loading veteran workspace cases...', 'warning');
-    const response = await fetch('/veteran/workspace/cases', { headers: authHeaders() });
+    const response = await WorkspaceApi.apiFetch('/veteran/workspace/cases');
     const payload = await response.json();
     listEl.innerHTML = '';
 
     if (!response.ok) {
+      if (WorkspaceApi.isAuthFailure(response, payload)) {
+        setSessionStatus('Session expired. Please sign in again.', 'error');
+        return;
+      }
       setSessionStatus(payload.detail || 'Unable to load cases. Sign in and try again.', 'error');
       return;
     }
@@ -120,9 +125,13 @@
     itemEl.classList.add('active');
 
     setActionFeedback('Loading case detail...', 'warning');
-    const response = await fetch(`/veteran/workspace/cases/${caseId}`, { headers: authHeaders() });
+    const response = await WorkspaceApi.apiFetch(`/veteran/workspace/cases/${caseId}`);
     const payload = await response.json();
     if (!response.ok) {
+      if (WorkspaceApi.isAuthFailure(response, payload)) {
+        setActionFeedback('Session expired. Please sign in again.', 'error');
+        return;
+      }
       setActionFeedback(payload.detail || 'Unable to load case detail.', 'error');
       return;
     }
@@ -162,11 +171,15 @@
       return;
     }
     setActionFeedback('Running veteran benefit discovery...', 'warning');
-    const response = await fetch(`/veteran/workspace/cases/${selectedCaseId}/actions/discover-benefits`, {
-      method: 'POST', headers: authHeaders(),
+    const response = await WorkspaceApi.apiFetch(`/veteran/workspace/cases/${selectedCaseId}/actions/discover-benefits`, {
+      method: 'POST',
     });
     const payload = await response.json();
     if (!response.ok) {
+      if (WorkspaceApi.isAuthFailure(response, payload)) {
+        setActionFeedback('Session expired. Please sign in again.', 'error');
+        return;
+      }
       setActionFeedback(payload.detail || 'Benefit discovery failed.', 'error');
       return;
     }
@@ -181,22 +194,26 @@
       return;
     }
     setActionFeedback('Generating veteran action plan...', 'warning');
-    const response = await fetch(`/veteran/workspace/cases/${selectedCaseId}/actions/generate-plan`, {
-      method: 'POST', headers: authHeaders(),
+    const response = await WorkspaceApi.apiFetch(`/veteran/workspace/cases/${selectedCaseId}/actions/generate-plan`, {
+      method: 'POST',
     });
     const payload = await response.json();
     if (!response.ok) {
+      if (WorkspaceApi.isAuthFailure(response, payload)) {
+        setActionFeedback('Session expired. Please sign in again.', 'error');
+        return;
+      }
       setActionFeedback(payload.detail || 'Action plan failed.', 'error');
       return;
     }
     setActionFeedback(`Plan generated. Next steps: ${(payload.steps || []).join(' | ') || '—'}`, 'success');
   });
 
-  if (localStorage.getItem(AUTH_TOKEN_KEY)) {
+  if (WorkspaceApi.tokenExists()) {
     setSessionStatus('Using active sign-in session from Universal Pilot CRM.', 'success');
     loadCases();
   } else {
-    setSessionStatus('No active session found. Sign in at /#/login (or /#/admin-command-center), then return here.', 'warning');
+    signedOutState();
   }
 </script>
 </body>
