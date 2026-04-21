@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Skiptrace Workspace</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <style>
+    .layout { display: grid; grid-template-columns: 320px 1fr 320px; gap: 16px; }
+    .list-item { padding: 10px; border: 1px solid #d9e2ec; border-radius: 10px; margin-bottom: 8px; cursor: pointer; }
+    .list-item.active { border-color: #1f7aec; background: #f0f7ff; }
+    .status-banner { margin-bottom: 12px; padding: 10px; border-radius: 8px; border: 1px solid #d9e2ec; background: #f8fafc; }
+    .status-banner.warning { background: #fff8e1; border-color: #ffecb3; }
+    .status-banner.success { background: #edf7ed; border-color: #c8e6c9; }
+    .status-banner.error { background: #fdecea; border-color: #f5c2c7; }
+    .helper-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 10px; }
+    .contact-card { border: 1px solid #d9e2ec; border-radius: 10px; padding: 10px; margin-bottom: 8px; background: #f8fbff; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Skiptrace Workspace</h1>
+    <p>Search queue → review contact confidence → run/retry/confirm skiptrace.</p>
+  </header>
+
+  <section class="card">
+    <div id="session-status" class="status-banner"></div>
+    <div class="helper-row">
+      <input id="search-input" type="text" placeholder="Search by address, state, owner, or case id" />
+      <button class="primary" id="load-cases">Refresh Queue</button>
+      <a href="/#/admin-command-center">Back to Command Center</a>
+    </div>
+  </section>
+
+  <section class="layout">
+    <article class="card">
+      <h3>Skiptrace Queue</h3>
+      <div id="case-list"></div>
+    </article>
+
+    <article class="card">
+      <h3>Case Detail + Results</h3>
+      <div id="case-detail">Select a case to review property and skiptrace results.</div>
+      <h4>Contact Results</h4>
+      <div id="result-cards"></div>
+      <h4>Lookup History</h4>
+      <ul id="history-list"></ul>
+    </article>
+
+    <article class="card">
+      <h3>Actions</h3>
+      <label class="field"><span>Provider</span>
+        <select id="provider">
+          <option value="batchdata">BatchData</option>
+          <option value="propstream">PropStream</option>
+          <option value="peopledatalabs">People Data Labs</option>
+        </select>
+      </label>
+      <button class="primary" id="run-skiptrace">Run Skiptrace</button>
+      <button class="ghost" id="retry-skiptrace">Retry Lookup</button>
+      <form id="confirm-form">
+        <label class="field"><span>Confirmed owner name</span><input name="owner_name" /></label>
+        <label class="field"><span>Confirmed phone</span><input name="phone" /></label>
+        <label class="field"><span>Confirmed email</span><input name="email" /></label>
+        <button class="primary" type="submit">Confirm / Use Result</button>
+      </form>
+      <div class="response" id="action-response"></div>
+    </article>
+  </section>
+
+<script src="/workspace-api.js"></script>
+<script>
+  let selectedCaseId = null;
+  const listEl = document.getElementById('case-list');
+  const sessionStatusEl = document.getElementById('session-status');
+  const actionResponseEl = document.getElementById('action-response');
+
+  function setSessionStatus(message, kind = '') {
+    sessionStatusEl.textContent = message;
+    sessionStatusEl.className = `status-banner ${kind}`.trim();
+  }
+
+  function setActionFeedback(message, kind = '') {
+    actionResponseEl.textContent = message;
+    actionResponseEl.className = `response ${kind}`.trim();
+  }
+
+  function signedOutState() {
+    setSessionStatus('');
+    sessionStatusEl.innerHTML = 'You are not signed in. <a href="/#/login">Sign in</a> to continue.';
+    sessionStatusEl.className = 'status-banner warning';
+  }
+
+  function contactCards(result) {
+    const cards = document.getElementById('result-cards');
+    cards.innerHTML = '';
+    if (!result) {
+      cards.innerHTML = '<p class="hint">No lookup has been run yet for this case.</p>';
+      return;
+    }
+
+    const owner = document.createElement('div');
+    owner.className = 'contact-card';
+    owner.innerHTML = `<strong>Owner Name</strong><div>${result.owner_name || '—'}</div>`;
+    cards.appendChild(owner);
+
+    const phones = document.createElement('div');
+    phones.className = 'contact-card';
+    phones.innerHTML = `<strong>Phones</strong><div>${(result.phones || []).join(', ') || '—'}</div>`;
+    cards.appendChild(phones);
+
+    const emails = document.createElement('div');
+    emails.className = 'contact-card';
+    emails.innerHTML = `<strong>Emails</strong><div>${(result.emails || []).join(', ') || '—'}</div>`;
+    cards.appendChild(emails);
+  }
+
+  async function loadCases() {
+    setSessionStatus('Loading skiptrace queue...', 'warning');
+    const search = document.getElementById('search-input').value.trim();
+    const url = search ? `/skiptrace/workspace/cases?search=${encodeURIComponent(search)}` : '/skiptrace/workspace/cases';
+    const response = await WorkspaceApi.apiFetch(url);
+    const payload = await response.json();
+    listEl.innerHTML = '';
+
+    if (!response.ok) {
+      if (WorkspaceApi.isAuthFailure(response, payload)) {
+        setSessionStatus('Session expired. Please sign in again.', 'error');
+        return;
+      }
+      setSessionStatus(payload.detail || 'Unable to load queue.', 'error');
+      return;
+    }
+
+    if (!payload.length) {
+      setSessionStatus('Connected. No cases in skiptrace queue.', 'success');
+      listEl.innerHTML = '<p class="hint">No matching cases found.</p>';
+      return;
+    }
+
+    payload.forEach((row) => {
+      const item = document.createElement('div');
+      item.className = 'list-item';
+      item.dataset.caseId = row.case_id;
+      item.innerHTML = `<strong>${row.property_address || 'Unknown property'}</strong><br/><small>${row.city || ''}, ${row.state || ''}</small><br/><small>Owner hint: ${row.owner_hint || '—'}</small>`;
+      item.addEventListener('click', () => selectCase(row.case_id, item));
+      listEl.appendChild(item);
+    });
+
+    setSessionStatus('Connected. Skiptrace queue loaded with active admin session.', 'success');
+  }
+
+  async function selectCase(caseId, itemEl) {
+    selectedCaseId = caseId;
+    document.querySelectorAll('.list-item').forEach((el) => el.classList.remove('active'));
+    itemEl.classList.add('active');
+
+    setActionFeedback('Loading skiptrace details...', 'warning');
+    const response = await WorkspaceApi.apiFetch(`/skiptrace/workspace/cases/${caseId}`);
+    const payload = await response.json();
+    if (!response.ok) {
+      setActionFeedback(payload.detail || 'Unable to load detail.', 'error');
+      return;
+    }
+
+    const property = payload.property || {};
+    document.getElementById('case-detail').innerHTML = `
+      <strong>Case ID:</strong> ${payload.case_id}<br/>
+      <strong>Property:</strong> ${property.address || '—'}, ${property.city || '—'}, ${property.state || '—'}<br/>
+      <strong>Stage:</strong> ${property.foreclosure_stage || '—'}<br/>
+      <strong>Owner hint:</strong> ${payload.owner_hint || '—'}
+    `;
+    contactCards(payload.current_result);
+
+    const historyEl = document.getElementById('history-list');
+    historyEl.innerHTML = '';
+    (payload.history || []).forEach((entry) => {
+      const li = document.createElement('li');
+      li.textContent = `${entry.created_at || '—'} — ${entry.action_type} (${entry.reason_code})`;
+      historyEl.appendChild(li);
+    });
+
+    setActionFeedback('Detail loaded. Run, retry, or confirm the best contact result.', 'success');
+  }
+
+  async function runAction(path, body, successMessageBuilder) {
+    if (!selectedCaseId) {
+      setActionFeedback('Select a case before running actions.', 'warning');
+      return;
+    }
+    setActionFeedback('Processing action...', 'warning');
+    const response = await WorkspaceApi.apiFetch(`/skiptrace/workspace/cases/${selectedCaseId}${path}`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+    const payload = await response.json();
+    if (!response.ok) {
+      setActionFeedback(payload.detail || 'Action failed.', 'error');
+      return;
+    }
+    setActionFeedback(successMessageBuilder(payload), 'success');
+    await loadCases();
+    const active = document.querySelector(`.list-item[data-case-id="${selectedCaseId}"]`);
+    if (active) await selectCase(selectedCaseId, active);
+  }
+
+  document.getElementById('load-cases').addEventListener('click', loadCases);
+  document.getElementById('search-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      loadCases();
+    }
+  });
+  document.getElementById('run-skiptrace').addEventListener('click', () => {
+    runAction('/actions/run', { provider: document.getElementById('provider').value }, (p) => `Skiptrace run complete. Owner: ${p.result?.owner_name || '—'}.`);
+  });
+  document.getElementById('retry-skiptrace').addEventListener('click', () => {
+    runAction('/actions/retry', { provider: document.getElementById('provider').value }, (p) => `Retry complete. New result owner: ${p.result?.owner_name || '—'}.`);
+  });
+  document.getElementById('confirm-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const formData = Object.fromEntries(new FormData(e.target).entries());
+    runAction('/actions/confirm', formData, (p) => `Confirmed contact for ${p.confirmed_contact?.owner_name || 'case'}.`);
+  });
+
+  if (WorkspaceApi.tokenExists()) {
+    setSessionStatus('Using active sign-in session from Universal Pilot CRM.', 'success');
+    loadCases();
+  } else {
+    signedOutState();
+  }
+</script>
+</body>
+</html>
