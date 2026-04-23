@@ -3,7 +3,7 @@
 from datetime import datetime
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from audit.logger import log_audit
@@ -123,3 +123,35 @@ def create_case(case_data: CaseCreateRequest, db: Session = Depends(get_db)):
         "id": str(new_case.id),
         "status": new_case.status.value,
     }
+
+
+@router.get("/cases")
+def list_cases(
+    status: CaseStatus | None = Query(default=None),
+    program_key: str | None = Query(default=None),
+    created_from: datetime | None = Query(default=None),
+    created_to: datetime | None = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    query = db.query(Case)
+
+    if status is not None:
+        query = query.filter(Case.status == status)
+    if program_key is not None:
+        query = query.filter(Case.program_key == program_key)
+    if created_from is not None:
+        query = query.filter(Case.created_at >= created_from)
+    if created_to is not None:
+        query = query.filter(Case.created_at <= created_to)
+
+    cases = query.order_by(Case.created_at.desc()).all()
+    return [
+        {
+            "id": str(case.id),
+            "program_key": case.program_key,
+            "created_at": case.created_at.isoformat() if case.created_at else None,
+            "status": case.status.value if case.status else None,
+            "meta": case.meta or {},
+        }
+        for case in cases
+    ]

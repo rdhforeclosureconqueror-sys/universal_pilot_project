@@ -1,9 +1,11 @@
 from pathlib import Path
 import os
+import logging
 
 from fastapi import FastAPI
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy.exc import SQLAlchemyError
 
 # Core services
 from app.services.auth_service import ensure_admin_user
@@ -61,6 +63,7 @@ from app.routers import webhooks
 
 
 app = FastAPI()
+logger = logging.getLogger(__name__)
 
 
 # =====================================================
@@ -194,11 +197,16 @@ def admin_system_page():
 
 @app.on_event("startup")
 def bootstrap_admin_user() -> None:
-    db = SessionLocal()
+    db = None
     try:
+        db = SessionLocal()
         ensure_admin_user(db)
+        load_modules_on_startup(app)
+    except SQLAlchemyError as exc:
+        logger.warning(
+            "Database unavailable during startup bootstrap/module load; app will continue and DB-backed routes will fail until connectivity is restored: %s",
+            exc,
+        )
     finally:
-        db.close()
-
-    # Safe dynamic module activation (Phase 8 loader foundation)
-    load_modules_on_startup(app)
+        if db is not None:
+            db.close()
